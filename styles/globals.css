@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@reference "tailwindcss";
+
+
+/* Base styling to ensure dark-by-default appearance and readable contrast */
+html, body, #__next {
+  height: 100%;
+}
+body {
+  @apply bg-white;
+}
+html.dark body {
+  @apply bg-gray-900 text-gray-100;
+}
+/* Dark mode variants */
+.dark {
+  /* Let Tailwind's dark variants take effect when .dark is present */
+}
+
+/* Simple utility to ensure consistent container width like before */
+.container {
+  @apply max-w-5xl mx-auto px-4;
+}
