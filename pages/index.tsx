@@ -1,7 +1,6 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Card } from '@/ui/card'
 import Button from '@/ui/button'
-import ThemeToggle from '@/components/ThemeToggle'
 
 type Project = { id: number; title: string; description: string }
 
@@ -15,35 +14,62 @@ const projects: Project[] = [
 ]
 
 const Home: React.FC = () => {
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'))
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -8% 0px' },
+    )
+
+    elements.forEach((element, index) => {
+      element.style.setProperty('--reveal-delay', `${Math.min(index * 90, 520)}ms`)
+      observer.observe(element)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className="min-h-screen">
-      <header className="p-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="min-h-screen page-shell">
+      <div className="ambient ambient-top" aria-hidden="true" />
+      <div className="ambient ambient-bottom" aria-hidden="true" />
+
+      <header className="p-4 border-b border-zinc-900/80 sticky top-0 z-20 backdrop-blur-xl bg-black/80">
         <div className="container flex items-center justify-between">
-          <div className="text-xl font-semibold" aria-label="Site name">Your Name</div>
-          <div className="flex items-center gap-2" aria-label="Theme toggle">
-            <ThemeToggle />
+          <div className="text-xl font-semibold tracking-tight" aria-label="Site name">Your Name</div>
+          <div className="badge-chip" aria-label="Theme mode">
+            ABSOLUTE DARK
           </div>
         </div>
       </header>
 
       <main>
-        <section className="container py-12 grid md:grid-cols-2 gap-6 items-center" id="home">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Hi, I'm Your Name</h1>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">I craft modern, performant web experiences with minimal, purposeful design.</p>
+        <section className="container py-14 grid md:grid-cols-2 gap-8 items-center" id="home">
+          <div data-reveal className="reveal-up">
+            <h1 className="text-4xl md:text-5xl font-bold mb-3 leading-tight">Hi, I&apos;m Your Name</h1>
+            <p className="text-zinc-300 mb-6 text-lg">I craft modern, performant web experiences with minimal, purposeful design.</p>
             <Button variant="primary" onClick={() => document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' })}>View Projects</Button>
           </div>
-          <div className="h-64 rounded-xl bg-gradient-to-tr from-indigo-500 to-teal-500"></div>
+          <div data-reveal className="reveal-right hero-visual h-72 md:h-80 rounded-2xl" />
         </section>
 
         <section className="container py-8" id="projects">
-          <h2 className="text-2xl font-semibold mb-4">Projects</h2>
+          <div data-reveal className="reveal-up">
+            <h2 className="text-2xl font-semibold mb-4">Projects</h2>
+          </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((p) => (
-              <Card key={p.id}>
+              <Card key={p.id} className="project-card reveal-up" data-reveal>
                 <div className="p-4">
                   <h3 className="font-semibold text-lg mb-1">{p.title}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{p.description}</p>
+                  <p className="text-sm text-zinc-400">{p.description}</p>
                 </div>
               </Card>
             ))}
@@ -51,23 +77,27 @@ const Home: React.FC = () => {
         </section>
 
         <section className="container py-8" id="about">
-          <h2 className="text-2xl font-semibold mb-4">About</h2>
-          <p className="text-gray-700 dark:text-gray-300">I'm a software engineer who values clarity, simplicity, and impact. I love turning complex problems into elegant, maintainable code and delightful user experiences.</p>
-          <ul className="mt-4 list-disc pl-6 text-gray-700 dark:text-gray-300">
-            <li>Languages: JavaScript/TypeScript, HTML, CSS</li>
-            <li>Frameworks: React, Next.js, Node.js</li>
-            <li>Principles: Accessible by default, fast by design</li>
-          </ul>
+          <div data-reveal className="section-panel reveal-up">
+            <h2 className="text-2xl font-semibold mb-4">About</h2>
+            <p className="text-zinc-300">I&apos;m a software engineer who values clarity, simplicity, and impact. I love turning complex problems into elegant, maintainable code and delightful user experiences.</p>
+            <ul className="mt-4 list-disc pl-6 text-zinc-300 space-y-1">
+              <li>Languages: JavaScript/TypeScript, HTML, CSS</li>
+              <li>Frameworks: React, Next.js, Node.js</li>
+              <li>Principles: Accessible by default, fast by design</li>
+            </ul>
+          </div>
         </section>
 
-        <section className="container py-8" id="contact">
-          <h2 className="text-2xl font-semibold mb-4">Contact</h2>
-          <form className="grid md:grid-cols-2 gap-4" onSubmit={(e)=>e.preventDefault()}>
-            <input className="rounded-md border border-gray-300 p-2" placeholder="Name" />
-            <input className="rounded-md border border-gray-300 p-2" placeholder="Email" />
-            <textarea className="col-span-2 rounded-md border border-gray-300 p-2 h-28" placeholder="Message" />
-            <button className="col-span-2 bg-indigo-600 text-white rounded-md px-4 py-2" type="submit">Send Message</button>
-          </form>
+        <section className="container py-8 pb-16" id="contact">
+          <div data-reveal className="section-panel reveal-up">
+            <h2 className="text-2xl font-semibold mb-4">Contact</h2>
+            <form className="grid md:grid-cols-2 gap-4" onSubmit={(e)=>e.preventDefault()}>
+              <input className="field-input" placeholder="Name" />
+              <input className="field-input" placeholder="Email" />
+              <textarea className="col-span-2 field-input min-h-28" placeholder="Message" />
+              <button className="col-span-2 bg-white text-black rounded-md px-4 py-2 font-medium transition hover:bg-zinc-200" type="submit">Send Message</button>
+            </form>
+          </div>
         </section>
       </main>
     </div>

@@ -8,10 +8,10 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'default', className = '', children, ...rest }, ref) => {
-    const base = 'inline-flex items-center px-4 py-2 rounded-md border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2'
+    const base = 'inline-flex items-center px-4 py-2 rounded-md border text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black'
     const color = variant === 'primary'
-      ? 'bg-indigo-600 text-white border-transparent hover:bg-indigo-700'
-      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+      ? 'bg-white text-black border-transparent hover:bg-zinc-200'
+      : 'bg-zinc-900 text-zinc-100 border-zinc-700 hover:bg-zinc-800'
     return (
       <button ref={ref} className={`${base} ${color} ${className}`} {...rest}>
         {children}
