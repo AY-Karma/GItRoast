@@ -5,8 +5,7 @@ Your GitHub has been talking behind your back.
 GitRoast is a production-ready Next.js app that analyzes a public GitHub profile and generates a humorous, screenshot-friendly AI roast report about coding habits, repository patterns, commit messages, and project follow-through.
 
 > [!NOTE]
-> This app is in very early stages with tons of improvements to UI, Performance & overall feel of the App to be made.
-> Enjoy the app with that in mind!
+> This app is in very early stages with many improvements to be made to it, Keep that in mind & Enjoy!!
 
 
 ## Features
