@@ -67,6 +67,9 @@ export function detectPatterns(repos: GitHubRepo[], commits: CommitSignal[]) {
     consistencyScore: 0,
     chaosScore: 0,
     recentActivityCount: commits.filter((commit) => daysSince(commit.date) <= 90).length,
+    activityTimeline: [],
+    contributions: [],
+    totalContributions: 0,
     topPatterns: [],
     commitSamples: commits.map((commit) => commit.message).slice(0, 12),
     repos: repos.slice(0, 20).map((repo) => ({
@@ -93,19 +96,37 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const languages = unique(repos.map((repo) => repo.language).filter(Boolean) as string[]);
   const inactiveRepos = calculateInactiveRepos(repos);
   const readmeCoverage = calculateReadmeCoverage(repos, snapshot.readmes);
-  const avgCommitLength = calculateAverageCommitLength(snapshot.commits);
-  const todoDensity = estimateTodoDensity(repos, snapshot.commits);
-  const recentActivityCount = snapshot.commits.filter((commit) => daysSince(commit.date) <= 90).length;
+  const commitSignals =
+    snapshot.commits.length > 0
+      ? snapshot.commits
+      : snapshot.repos.slice(0, 12).map((repo) => ({
+          repo: repo.name,
+          message: `pushed ${repo.name}`,
+          date: repo.pushed_at ?? repo.updated_at
+        }));
+  const avgCommitLength = calculateAverageCommitLength(commitSignals);
+  const todoDensity = estimateTodoDensity(repos, commitSignals);
+  const recentActivityCount = snapshot.contributions.filter((day) => daysSince(day.date) <= 90).reduce((sum, day) => sum + day.count, 0);
   const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
   const totalForks = repos.reduce((sum, repo) => sum + repo.forks_count, 0);
   const shippingScore = clamp(Math.round(100 - (inactiveRepos / Math.max(repos.length, 1)) * 100), 8, 98);
-  const consistencyScore = clamp(Math.round((recentActivityCount / Math.max(snapshot.commits.length, 1)) * 100), 8, 96);
+  const consistencyScore = clamp(Math.round((recentActivityCount / Math.max(snapshot.contributions.length, 1)) * 12), 8, 96);
   const languageDiversityScore = clamp(Math.round((languages.length / Math.max(repos.length, 1)) * 180), 10, 95);
   const chaosScore = clamp(
     Math.round(100 - (readmeCoverage * 0.28 + shippingScore * 0.34 + consistencyScore * 0.22) + todoDensity * 0.42),
     6,
     99
   );
+  const sortedContributions = [...snapshot.contributions].sort((a, b) => a.date.localeCompare(b.date));
+  const recentContributions = sortedContributions.slice(Math.max(0, sortedContributions.length - 84));
+  const weeklyBuckets = Array.from({ length: 12 }, (_, index) => {
+    const slice = recentContributions.slice(index * 7, index * 7 + 7);
+    return {
+      label: slice[0]?.date ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(slice[0].date)) : `W${index + 1}`,
+      count: slice.reduce((sum, day) => sum + day.count, 0),
+      date: slice[0]?.date ?? ""
+    };
+  }).filter((bucket) => bucket.date || bucket.count > 0);
 
   return {
     username: snapshot.profile.login,
@@ -125,8 +146,11 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
     consistencyScore,
     chaosScore,
     recentActivityCount,
+    activityTimeline: weeklyBuckets,
+    contributions: sortedContributions,
+    totalContributions: sortedContributions.reduce((sum, day) => sum + day.count, 0),
     topPatterns: detectPatterns(repos, snapshot.commits),
-    commitSamples: snapshot.commits.map((commit) => commit.message).slice(0, 12),
+    commitSamples: commitSignals.map((commit) => commit.message).slice(0, 12),
     repos: repos.slice(0, 20).map((repo) => ({
       name: repo.name,
       description: repo.description,

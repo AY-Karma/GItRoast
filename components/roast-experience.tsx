@@ -2,20 +2,17 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BadgeCheck,
   Flame,
   Github,
   GitPullRequest,
   Loader2,
-  Quote,
   Sparkles,
-  Star,
   TerminalSquare,
-  Trophy,
   WandSparkles
 } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CommitChart } from "@/components/commit-chart";
 import { ScoreRing } from "@/components/score-ring";
 import { ShareCard } from "@/components/share-card";
 import { Button } from "@/components/ui/button";
@@ -238,7 +235,7 @@ export function RoastExperience() {
           className="relative z-10"
         >
           <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-[1fr_auto] md:px-6">
-            <Card className="flex flex-col gap-8 overflow-hidden p-6 sm:p-8 md:flex-row md:items-center">
+            <Card className="flex h-full flex-col gap-8 overflow-hidden p-6 sm:p-8 md:flex-row md:items-center">
               <Image
                 src={result.summary.avatarUrl}
                 alt={`${result.summary.username} avatar`}
@@ -252,11 +249,11 @@ export function RoastExperience() {
                   <span>{compactNumber(result.summary.totalStars)} stars</span>
                   <span>{compactNumber(result.summary.totalForks)} forks</span>
                 </div>
-                <h2 className="text-4xl font-black tracking-normal md:text-6xl">{result.report.developerType}</h2>
-                <p className="mt-4 max-w-2xl text-lg leading-8 text-zinc-300">{result.report.archetypeDescription}</p>
+                <h2 className="text-4xl font-black tracking-normal md:text-6xl break-words">{result.report.developerType}</h2>
+                <p className="mt-4 max-w-2xl text-lg leading-8 text-zinc-300 break-words">{result.report.archetypeDescription}</p>
               </div>
             </Card>
-            <Card className="grid place-items-center p-6">
+            <Card className="grid h-full place-items-center p-6">
               <ScoreRing value={result.report.roastScore} />
             </Card>
           </motion.section>
@@ -264,59 +261,38 @@ export function RoastExperience() {
           <motion.section variants={reveal} className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
             <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-pink/24 via-violet/18 to-cyan/16 p-8 shadow-glow sm:p-12">
               <WandSparkles className="mb-8 size-10 text-cyan" />
-              <p className="max-w-5xl text-4xl font-black leading-tight tracking-normal md:text-6xl">{result.report.roast}</p>
+              <p className="max-w-5xl text-4xl font-black leading-tight tracking-normal md:text-6xl break-words">{result.report.roast}</p>
               <div className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-zinc-300">
                 Generated with {result.generatedWith === "openai" ? "AI" : "local fallback"}
               </div>
             </div>
           </motion.section>
 
-          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 md:grid-cols-[.8fr_1.2fr] md:px-6">
-            <Card className="p-7">
-              <TerminalSquare className="mb-5 size-9 text-pink" />
-              <h2 className="text-3xl font-black tracking-normal">Developer Archetype</h2>
-              <p className="mt-4 text-lg leading-8 text-zinc-300">{result.report.archetypeDescription}</p>
+          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl items-stretch gap-6 px-4 py-8 md:grid-cols-[.92fr_1.08fr] md:px-6">
+            <Card className="flex h-full flex-col p-7">
+              <div className="flex-1">
+                <TerminalSquare className="mb-5 size-9 text-pink" />
+                <h2 className="text-3xl font-black tracking-normal">Developer Archetype</h2>
+                <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-300">{result.report.archetypeDescription}</p>
+              </div>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Primary repo</div>
+                  <div className="mt-2 text-xl font-black break-all">{result.summary.repos[0]?.name ?? "mystery"}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Recent streak</div>
+                  <div className="mt-2 text-xl font-black">{result.summary.recentActivityCount}</div>
+                </div>
+              </div>
             </Card>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {result.summary.topPatterns.map((pattern) => (
-                <Card key={pattern} className="flex items-start gap-4 p-5">
-                  <BadgeCheck className="mt-1 size-5 shrink-0 text-cyan" />
-                  <span className="font-semibold leading-7 text-zinc-100">{pattern}</span>
-                </Card>
-              ))}
-            </div>
+            <CommitChart summary={result.summary} />
           </motion.section>
 
           <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-8 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
             {stats.map((stat) => (
               <MetricCard key={stat.label} {...stat} />
             ))}
-          </motion.section>
-
-          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 md:grid-cols-2 md:px-6">
-            <Card className="p-7">
-              <Trophy className="mb-5 size-9 text-cyan" />
-              <h2 className="text-3xl font-black tracking-normal">Fake LinkedIn Endorsements</h2>
-              <div className="mt-6 grid gap-3">
-                {result.report.endorsements.map((endorsement, index) => (
-                  <div key={`${endorsement}-${index}`} className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 font-semibold">
-                    Endorsed for: {endorsement}
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card className="p-7">
-              <Quote className="mb-5 size-9 text-pink" />
-              <h2 className="text-3xl font-black tracking-normal">Fake Testimonials</h2>
-              <div className="mt-6 flex snap-x gap-4 overflow-x-auto pb-2">
-                {result.report.testimonials.map((testimonial, index) => (
-                  <div key={`${testimonial.by}-${index}`} className="min-w-[260px] snap-start rounded-3xl border border-white/10 bg-white/[0.06] p-5">
-                    <p className="text-lg font-bold leading-7">&quot;{testimonial.quote}&quot;</p>
-                    <div className="mt-5 text-sm font-semibold text-zinc-400">- {testimonial.by}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
           </motion.section>
 
           <motion.section variants={reveal} className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
@@ -327,7 +303,7 @@ export function RoastExperience() {
                 {result.report.commitCrimes.map((crime, index) => (
                   <div key={`${crime.message}-${index}`} className="grid gap-3 rounded-3xl border border-white/10 bg-black/20 p-5 md:grid-cols-[.6fr_1fr]">
                     <code className="break-words rounded-2xl bg-black/35 p-4 font-mono text-sm text-cyan">{crime.message}</code>
-                    <p className="font-semibold leading-7 text-zinc-200">{crime.commentary}</p>
+                    <p className="font-semibold leading-7 text-zinc-200 break-words">{crime.commentary}</p>
                   </div>
                 ))}
               </div>

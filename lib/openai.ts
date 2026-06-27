@@ -4,10 +4,8 @@ import { clamp } from "@/lib/utils";
 import {
   repoAwareArchetype,
   repoAwareCommitCommentary,
-  repoAwareEndorsements,
   repoAwareRoast,
   repoAwareStrengths,
-  repoAwareTestimonials,
   repoAwareWeaknesses
 } from "@/lib/roast-copy";
 
@@ -29,8 +27,6 @@ function normalizeReport(report: Partial<RoastReport>, summary: RoastSummary): R
     roast: report.roast || repoAwareRoast(summary),
     strengths: report.strengths?.slice(0, 4) ?? repoAwareStrengths(summary),
     weaknesses: report.weaknesses?.slice(0, 4) ?? repoAwareWeaknesses(summary),
-    endorsements: report.endorsements?.slice(0, 4) ?? repoAwareEndorsements(summary),
-    testimonials: report.testimonials?.slice(0, 4) ?? repoAwareTestimonials(summary),
     commitCrimes:
       report.commitCrimes?.slice(0, 5) ??
       summary.commitSamples.slice(0, 5).map((message) => ({
@@ -69,7 +65,7 @@ export async function generateRoast(summary: RoastSummary): Promise<{ report: Ro
       {
         role: "system",
         content:
-          "You are a legendary senior engineer and stand-up comedian. Generate witty, clever, highly shareable roasts about coding behavior only. Never attack personal traits, protected classes, identity, appearance, or life circumstances. Be funny, not hateful or cruel. Focus on repositories, commits, unfinished projects, naming choices, TODO comments, architecture habits, documentation habits, repo names, and repo descriptions. Use the supplied repository summary to make the roast feel custom, specific, and unusually observant. Return strict JSON with keys: developerType, archetypeDescription, roastScore, roast, strengths, weaknesses, endorsements, testimonials, commitCrimes. testimonials must be objects with quote and by. commitCrimes must be objects with message and commentary. Make every comment sound like it was written after actually reading the repos."
+          "You are a legendary senior engineer and stand-up comedian. Generate witty, clever, highly shareable roasts about coding behavior only. Never attack personal traits, protected classes, identity, appearance, or life circumstances. Be funny, not hateful or cruel. Focus on repositories, commits, unfinished projects, naming choices, TODO comments, architecture habits, documentation habits, repo names, and repo descriptions. Use the supplied repository summary to make the roast feel custom, specific, and unusually observant. Return strict JSON with keys: developerType, archetypeDescription, roastScore, roast, strengths, weaknesses, commitCrimes. commitCrimes must be objects with message and commentary. Make every comment sound like it was written after actually reading the repos."
       },
       {
         role: "user",

@@ -1,4 +1,11 @@
-import type { CommitSignal, GitHubProfile, GitHubRepo, GitHubSnapshot, RepoReadmeSignal } from "@/lib/types";
+import type {
+  CommitSignal,
+  ContributionDay,
+  GitHubProfile,
+  GitHubRepo,
+  GitHubSnapshot,
+  RepoReadmeSignal
+} from "@/lib/types";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -67,6 +74,41 @@ function textBetween(html: string, pattern: RegExp) {
   return match?.[1] ? decodeHtml(match[1].replace(/<[^>]*>/g, "")) : null;
 }
 
+async function fetchContributionDays(username: string): Promise<ContributionDay[]> {
+  const response = await fetch(`https://github.com/users/${username}/contributions`, {
+    headers: { "User-Agent": "GitRoast" },
+    next: { revalidate: 900 }
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const html = await response.text();
+
+  const rectMatches = Array.from(html.matchAll(/data-date="([^"]+)"[^>]*data-level="(\d+)"/g))
+    .map((m) => ({ date: m[1], level: Number(m[2]) }));
+
+  if (!rectMatches.length) return [];
+
+  const tooltipMatches = Array.from(html.matchAll(/<tool-tip[^>]*>([\s\S]*?)<\/tool-tip>/g))
+    .map((m) => decodeHtml(m[1]));
+
+  const ESTIMATES: Record<number, number> = { 1: 2, 2: 5, 3: 8, 4: 15 };
+
+  return rectMatches
+    .map((rect, i) => {
+      const tooltip = tooltipMatches[i] ?? "";
+      const count = tooltip
+        ? (tooltip.startsWith("No contributions")
+          ? 0
+          : Number(tooltip.match(/^(\d+)/)?.[1] ?? 0))
+        : (ESTIMATES[rect.level] ?? 0);
+      return { date: rect.date, count, level: rect.level };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 async function fetchWebSnapshot(username: string): Promise<GitHubSnapshot> {
   const response = await fetch(`https://github.com/${username}?tab=repositories`, {
     headers: { "User-Agent": "GitRoast" },
@@ -132,7 +174,8 @@ async function fetchWebSnapshot(username: string): Promise<GitHubSnapshot> {
     },
     repos,
     commits: [],
-    readmes: repos.map((repo) => ({ repo: repo.name, hasReadme: Boolean(repo.description) }))
+    readmes: repos.map((repo) => ({ repo: repo.name, hasReadme: Boolean(repo.description) })),
+    contributions: await fetchContributionDays(username)
   };
 }
 
@@ -197,12 +240,17 @@ export async function fetchGitHubSnapshot(rawUsername: string): Promise<GitHubSn
     throw error;
   }
 
-  const [commits, readmes] = await Promise.all([fetchCommits(username, repos), fetchReadmes(repos)]);
+  const [commits, readmes, contributions] = await Promise.all([
+    fetchCommits(username, repos),
+    fetchReadmes(repos),
+    fetchContributionDays(username)
+  ]);
 
   return {
     profile,
     repos,
     commits,
-    readmes
+    readmes,
+    contributions
   };
 }

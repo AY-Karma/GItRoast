@@ -40,11 +40,18 @@ export type CommitSignal = {
   date: string;
 };
 
+export type ContributionDay = {
+  date: string;
+  count: number;
+  level: number;
+};
+
 export type GitHubSnapshot = {
   profile: GitHubProfile;
   repos: GitHubRepo[];
   commits: CommitSignal[];
   readmes: RepoReadmeSignal[];
+  contributions: ContributionDay[];
 };
 
 export type RoastSummary = {
@@ -65,6 +72,13 @@ export type RoastSummary = {
   consistencyScore: number;
   chaosScore: number;
   recentActivityCount: number;
+  activityTimeline: Array<{
+    label: string;
+    count: number;
+    date: string;
+  }>;
+  contributions: ContributionDay[];
+  totalContributions: number;
   topPatterns: string[];
   commitSamples: string[];
   repos: Array<{
@@ -83,11 +97,6 @@ export type RoastReport = {
   roast: string;
   strengths: string[];
   weaknesses: string[];
-  endorsements: string[];
-  testimonials: Array<{
-    quote: string;
-    by: string;
-  }>;
   commitCrimes: Array<{
     message: string;
     commentary: string;

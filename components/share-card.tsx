@@ -10,7 +10,7 @@ import type { RoastResponse } from "@/lib/types";
 export function ShareCard({ result }: { result: RoastResponse }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
-  const bestEndorsement = result.report.endorsements[0] ?? "Shipping with theatrical confidence";
+  const bestSignal = result.summary.topPatterns[0] ?? result.summary.repos[0]?.name ?? "Shipping with theatrical confidence";
 
   async function copyText(text: string) {
     if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
@@ -96,15 +96,15 @@ export function ShareCard({ result }: { result: RoastResponse }) {
             </div>
           </div>
           <div>
-            <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white">
+            <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white break-words max-w-full">
               {result.report.developerType}
             </div>
-            <div className="max-w-xl text-5xl font-black leading-[0.98] tracking-normal sm:text-6xl">
+            <div className="max-w-xl text-5xl font-black leading-[0.98] tracking-normal sm:text-6xl break-words">
               {result.report.roastScore}/100 roast score.
             </div>
           </div>
-          <div className="rounded-3xl border border-white/10 bg-black/25 p-5 text-lg font-semibold text-zinc-100">
-            Endorsed for: {bestEndorsement}
+          <div className="rounded-3xl border border-white/10 bg-black/25 p-5 text-lg font-semibold text-zinc-100 break-words">
+            Endorsed for: {bestSignal}
           </div>
         </div>
       </div>
