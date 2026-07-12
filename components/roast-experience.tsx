@@ -11,7 +11,7 @@ import {
   WandSparkles
 } from "lucide-react";
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CommitChart } from "@/components/commit-chart";
 import { ScoreRing } from "@/components/score-ring";
 import { ShareCard } from "@/components/share-card";
@@ -35,6 +35,14 @@ const reveal = {
   show: { opacity: 1, y: 0 }
 };
 
+// Full class strings are required so Tailwind's static scanner can include them in the
+// output bundle. Dynamically assembled fragments like "from-" + tone are never detected.
+const TONE_CLASSES: Record<"pink" | "violet" | "cyan", string> = {
+  pink: "from-pink to-white",
+  violet: "from-violet to-white",
+  cyan: "from-cyan to-white"
+};
+
 function MetricCard({
   label,
   value,
@@ -46,7 +54,6 @@ function MetricCard({
   suffix?: string;
   tone?: "pink" | "violet" | "cyan";
 }) {
-  const color = tone === "pink" ? "from-pink" : tone === "violet" ? "from-violet" : "from-cyan";
   return (
     <Card className="p-5">
       <div className="mb-4 text-sm font-semibold text-zinc-400">{label}</div>
@@ -56,7 +63,7 @@ function MetricCard({
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
         <motion.div
-          className={cn("h-full rounded-full bg-gradient-to-r to-white", color)}
+          className={cn("h-full rounded-full bg-gradient-to-r", TONE_CLASSES[tone])}
           initial={{ width: 0 }}
           whileInView={{ width: `${Math.min(100, Math.max(6, value))}%` }}
           viewport={{ once: true }}
@@ -106,16 +113,9 @@ export function RoastExperience() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const user = params.get("u");
-    if (user) {
-      setUsername(user);
-      void submit(user);
-    }
-  }, []);
-
-  async function submit(value = username) {
+  // Wrapped in useCallback so the stable reference can be listed in the useEffect
+  // dependency array without triggering infinite re-renders.
+  const submit = useCallback(async (value: string) => {
     const clean = value.trim();
     if (!clean) return;
     setIsLoading(true);
@@ -131,18 +131,27 @@ export function RoastExperience() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to roast this profile.");
       setResult(payload as RoastResponse);
-      window.history.replaceState(null, "", `?u=${encodeURIComponent(clean)}`);
-      window.setTimeout(() => document.getElementById("report")?.scrollIntoView({ behavior: "smooth" }), 150);
+      history.replaceState(null, "", `?u=${encodeURIComponent(clean)}`);
+      setTimeout(() => document.getElementById("report")?.scrollIntoView({ behavior: "smooth" }), 150);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to roast this profile.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const user = params.get("u");
+    if (user) {
+      setUsername(user);
+      void submit(user);
+    }
+  }, [submit]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void submit();
+    void submit(username);
   }
 
   const stats = useMemo(() => {
@@ -211,6 +220,7 @@ export function RoastExperience() {
             {examples.map((example) => (
               <button
                 key={example}
+                type="button"
                 className="rounded-full border border-white/10 px-3 py-1 font-semibold text-zinc-200 transition hover:border-cyan/50 hover:text-cyan"
                 onClick={() => {
                   setUsername(example);
@@ -273,7 +283,13 @@ export function RoastExperience() {
               <div className="flex-1">
                 <TerminalSquare className="mb-5 size-9 text-pink" />
                 <h2 className="text-3xl font-black tracking-normal">Developer Archetype</h2>
-                <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-300">{result.report.archetypeDescription}</p>
+                {/* archetypeDescription is already shown in the profile card above; show
+                    the primary language stack here instead to avoid duplication. */}
+                <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-300">
+                  {result.summary.languages.length > 0
+                    ? `Primary stack: ${result.summary.languages.join(", ")}. ${result.summary.repoCount} public repos, ${result.summary.totalStars} total stars.`
+                    : result.report.archetypeDescription}
+                </p>
               </div>
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">

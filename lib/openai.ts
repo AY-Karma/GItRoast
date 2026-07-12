@@ -18,7 +18,13 @@ const fallbackTypes = [
 ];
 
 function normalizeReport(report: Partial<RoastReport>, summary: RoastSummary): RoastReport {
-  const score = clamp(Math.round(report.roastScore ?? 68 + summary.chaosScore * 0.24), 1, 100);
+  // Without explicit parentheses, `??` binds last so the addition only applies to the
+  // fallback value. Parenthesise clearly: use the AI score directly if present, otherwise
+  // derive one from chaosScore.
+  const score =
+    report.roastScore != null
+      ? clamp(Math.round(report.roastScore), 1, 100)
+      : clamp(Math.round(68 + summary.chaosScore * 0.24), 1, 100);
   return {
     developerType: report.developerType || fallbackTypes[summary.chaosScore % fallbackTypes.length],
     archetypeDescription:

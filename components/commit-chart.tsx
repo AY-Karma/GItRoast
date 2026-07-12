@@ -106,17 +106,21 @@ export function CommitChart({ summary }: { summary: RoastSummary }) {
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0d1117] p-4">
         {hasData ? (
           <div>
-            <div className="relative h-4 pl-[38px]">
-              {monthLabels.map((month) => (
-                <span
-                  key={`${month.label}-${month.weekIndex}`}
-                  className="absolute text-[10px] text-[#8b949e]"
-                  style={{ left: `${month.weekIndex * 14}px` }}
-                >
-                  {month.label}
-                </span>
-              ))}
-            </div>
+            {/* The day-label column is 28px wide + 2px padding = 30px offset before the
+                grid starts. Each cell is 11px + 3px gap = 14px per week column.
+                Month label `left` must be offset by the full day-label width so the text
+                aligns with the week columns, not with the container edge. */}
+            <div className="relative h-4 pl-[30px]">
+                {monthLabels.map((month) => (
+                  <span
+                    key={`${month.label}-${month.weekIndex}`}
+                    className="absolute text-[10px] text-[#8b949e]"
+                    style={{ left: `calc(30px + ${month.weekIndex * 14}px)` }}
+                  >
+                    {month.label}
+                  </span>
+                ))}
+              </div>
 
             <div className="mt-1 flex gap-[3px]">
               <div className="flex flex-col gap-[3px] pr-[2px]">
