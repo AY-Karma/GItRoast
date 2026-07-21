@@ -15,6 +15,8 @@ const LEVEL_COLORS = [
 
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
+type DayCell = { date: string; count: number; level: number; className: string };
+
 function getWeeksGrid(contributions: Array<{ date: string; count: number; level: number }>) {
   if (!contributions.length) return { weeks: [], monthLabels: [], total: 0 };
 
@@ -30,21 +32,28 @@ function getWeeksGrid(contributions: Array<{ date: string; count: number; level:
   const endDate = new Date(lastDate);
   endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
 
-  const dateMap = new Map(sorted.map((d) => [d.date, d]));
+  // Pre-compute className for each cell so the render path reads a stable string instead
+  // of evaluating a ternary + array lookup on every render of 371 cells.
+  const dateMap = new Map(
+    sorted.map((d) => [d.date, { ...d, className: LEVEL_COLORS[d.level] ?? LEVEL_COLORS[0] }])
+  );
 
-  const weeks: Array<Array<{ date: string; count: number; level: number } | null>> = [];
+  const weeks: DayCell[][] = [];
   const monthLabels: Array<{ label: string; weekIndex: number }> = [];
   let lastMonth = -1;
 
   const current = new Date(startDate);
   let weekIndex = 0;
 
+  // Empty cell default — pre-built so we never allocate during render.
+  const emptyCell: DayCell = { date: "", count: 0, level: 0, className: LEVEL_COLORS[0] };
+
   while (current <= endDate) {
-    const week: Array<{ date: string; count: number; level: number } | null> = [];
+    const week: DayCell[] = [];
 
     for (let day = 0; day < 7; day++) {
       const dateStr = current.toISOString().split("T")[0];
-      const dayData = dateMap.get(dateStr) ?? null;
+      const dayData = dateMap.get(dateStr) ?? emptyCell;
 
       if (day === 0) {
         const month = current.getMonth();
@@ -98,7 +107,7 @@ export function CommitChart({ summary }: { summary: RoastSummary }) {
   }, [weeks, monthLabels, total, hasData, summary.contributions]);
 
   return (
-    <Card className="flex h-full flex-col gap-5 p-6 sm:p-7">
+    <Card className="flex flex-col gap-5 p-6 sm:p-7">
       <h3 className="text-2xl font-bold tracking-tight break-words">
         {compactNumber(total)} contributions in the last year
       </h3>
@@ -136,10 +145,8 @@ export function CommitChart({ summary }: { summary: RoastSummary }) {
                   {week.map((day, dayIdx) => (
                     <div
                       key={dayIdx}
-                      className={`h-[11px] w-[11px] rounded-[2px] ${
-                        day ? LEVEL_COLORS[day.level] : "bg-[#161b22]"
-                      }`}
-                      title={day ? `${day.count} contributions on ${day.date}` : ""}
+                      className={`h-[11px] w-[11px] rounded-[2px] ${day.className}`}
+                      title={day.date ? `${day.count} contributions on ${day.date}` : ""}
                     />
                   ))}
                 </div>

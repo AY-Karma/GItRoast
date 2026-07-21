@@ -180,7 +180,7 @@ export function RoastExperience() {
           animate="show"
           variants={{
             hidden: {},
-            show: { transition: { staggerChildren: 0.1 } }
+            show: { transition: { staggerChildren: 0.06 } }
           }}
           className="relative z-10"
         >
@@ -241,7 +241,7 @@ export function RoastExperience() {
           id="report"
           initial="hidden"
           animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.09 } } }}
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}
           className="relative z-10"
         >
           <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-[1fr_auto] md:px-6">
@@ -279,27 +279,29 @@ export function RoastExperience() {
           </motion.section>
 
           <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl items-stretch gap-6 px-4 py-8 md:grid-cols-[.92fr_1.08fr] md:px-6">
-            <Card className="flex h-full flex-col p-7">
-              <div className="flex-1">
-                <TerminalSquare className="mb-5 size-9 text-pink" />
-                <h2 className="text-3xl font-black tracking-normal">Developer Archetype</h2>
-                {/* archetypeDescription is already shown in the profile card above; show
-                    the primary language stack here instead to avoid duplication. */}
-                <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-300">
-                  {result.summary.languages.length > 0
-                    ? `Primary stack: ${result.summary.languages.join(", ")}. ${result.summary.repoCount} public repos, ${result.summary.totalStars} total stars.`
-                    : result.report.archetypeDescription}
-                </p>
+            <Card className="flex h-full flex-col justify-center gap-4 p-7">
+              <div className="mb-1 flex items-center gap-2">
+                <TerminalSquare className="size-5 text-pink" />
+                <span className="text-sm font-bold text-zinc-300">Coding Snapshot</span>
               </div>
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Primary repo</div>
-                  <div className="mt-2 text-xl font-black break-all">{result.summary.repos[0]?.name ?? "mystery"}</div>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Recent streak</div>
-                  <div className="mt-2 text-xl font-black">{result.summary.recentActivityCount}</div>
-                </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Primary repo</div>
+                {result.summary.repos[0] ? (
+                  <a
+                    href={`https://github.com/${result.summary.username}/${result.summary.repos[0].name}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 block break-all text-base font-black text-cyan underline-offset-2 hover:underline"
+                  >
+                    {result.summary.repos[0].name}
+                  </a>
+                ) : (
+                  <div className="mt-2 text-base font-black text-zinc-300">mystery</div>
+                )}
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Recent streak</div>
+                <div className="mt-2 text-xl font-black">{result.summary.recentActivityCount}</div>
               </div>
             </Card>
             <CommitChart summary={result.summary} />
@@ -317,9 +319,18 @@ export function RoastExperience() {
               <h2 className="text-3xl font-black tracking-normal">Commit Crimes</h2>
               <div className="mt-6 grid gap-4">
                 {result.report.commitCrimes.map((crime, index) => (
-                  <div key={`${crime.message}-${index}`} className="grid gap-3 rounded-3xl border border-white/10 bg-black/20 p-5 md:grid-cols-[.6fr_1fr]">
-                    <code className="break-words rounded-2xl bg-black/35 p-4 font-mono text-sm text-cyan">{crime.message}</code>
-                    <p className="font-semibold leading-7 text-zinc-200 break-words">{crime.commentary}</p>
+                  <div key={`${crime.message}-${index}`} className="grid md:grid-cols-[.6fr_1fr] rounded-3xl border border-white/10 bg-black/20 overflow-hidden">
+                    <a
+                      href={`https://github.com/search?q=author%3A${encodeURIComponent(result.summary.username)}+${encodeURIComponent(crime.message)}&type=commits`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start p-5 hover:bg-white/[0.04] transition-colors"
+                    >
+                      <code className="break-words font-mono text-sm text-cyan">{crime.message}</code>
+                    </a>
+                    <div className="flex items-start border-t border-white/10 p-5 md:border-l md:border-t-0">
+                      <p className="font-semibold leading-7 text-zinc-200 break-words">{crime.commentary}</p>
+                    </div>
                   </div>
                 ))}
               </div>

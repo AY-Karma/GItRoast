@@ -40,9 +40,11 @@ body {
 
 .glass {
   border: 1px solid rgba(255, 255, 255, 0.09);
-  background: linear-gradient(145deg, rgba(23, 23, 28, 0.92), rgba(23, 23, 28, 0.68));
+  /* Removed backdrop-filter: blur — each blurred Card forces a GPU compositor layer.
+     With 8+ cards on the result page this causes compositor layer explosion and scroll
+     jank. Replaced with a near-opaque solid background that is visually identical. */
+  background: linear-gradient(145deg, rgba(23, 23, 28, 0.97), rgba(23, 23, 28, 0.93));
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(22px);
 }
 
 .card-gradient {
