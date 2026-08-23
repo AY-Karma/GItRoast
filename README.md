@@ -1,58 +1,58 @@
 # GitRoast
 
-Your GitHub has been talking behind your back. Take a look on what it has to say about yours :)
+GitRoast turns a public GitHub profile into a funny, evidence-backed code review. It samples repository health, the public activity timeline, descriptions, languages, and contribution activity, then produces a shareable report.
 
-GitRoast is a production-ready Next.js app that analyzes a public GitHub profile and generates a humorous, screenshot-friendly AI roast report about coding habits, repository patterns, commit messages, and project follow-through.
+## What is in this version
 
-> [!NOTE]
-> This app is in very early stages with many improvements to be made to it, Keep that in mind & Enjoy!!
+- GitHub-native repository and profile interface with responsive review cards
+- Accessible loading, error, score, contribution, and keyboard states
+- Two-call GitHub REST budget with request timeouts and cached public signals
+- Recent commit subjects from GitHub's public Atom timeline, including during REST quota exhaustion
+- Evidence-specific local roasts plus optional OpenAI Responses API Structured Outputs
+- Grounded roast receipts, a constructive patch, prompt-injection resistance, and output safety checks
+- Lazy-loaded report and PNG exporter
+- One-hour result cache and best-effort per-instance request limiting
+- Bounded JSON body parsing, cross-site rejection, and production security headers
+- 1200 x 630 share-card export and matching Open Graph artwork
 
+The full product and architecture roadmap lives in [OVERHAUL.md](./OVERHAUL.md).
 
-## Features
-
-- Next.js 15 App Router with TypeScript and Tailwind CSS
-- Dark, motion-rich UI inspired by Spotify Wrapped, Linear, and Raycast
-- GitHub REST API profile, repository, README, and commit sampling
-- Structured summary calculations before AI prompting
-- OpenAI JSON roast generation with a local fallback
-- Share card generator with PNG download, copy link, and native share support
-- Vercel-ready configuration
-
-## Setup
-
-Install dependencies:
+## Run locally
 
 ```bash
 npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-Create `.env.local`:
+On PowerShell, use `Copy-Item .env.example .env.local` instead of `cp` if needed. Open [http://localhost:3000](http://localhost:3000).
 
-```bash
-OPENAI_API_KEY=your_openai_api_key
+Environment variables:
+
+```dotenv
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
-GITHUB_TOKEN=your_github_token
+GITHUB_TOKEN=
 ```
 
-`GITHUB_TOKEN` is optional, but recommended for higher GitHub API rate limits. If `OPENAI_API_KEY` is missing, GitRoast uses a deterministic local fallback roast.
+`OPENAI_API_KEY` is optional; without it, GitRoast uses the local roast engine. `GITHUB_TOKEN` is strongly recommended for higher public-API limits and should be a least-privilege token with no repository scopes.
 
-Run the app:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Scripts
+## Checks
 
 ```bash
-npm run dev
-npm run build
-npm run start
+npm run lint
+npm test
 npm run typecheck
+npm run build
+npm audit --omit=dev
 ```
 
-## Data Safety
+## Data and tone
 
-GitRoast does not send raw repository dumps to OpenAI. It fetches public GitHub data, calculates a compact structured summary, and sends only that summary to the model.
+GitRoast only requests public GitHub data. When OpenAI is configured, it sends a compact selection of public aggregates, repository names/descriptions, and recent public timeline commit subjects to the configured model; it does not send repository contents. Results may be cached for up to one hour.
+
+The scores are comic heuristics, not measures of skill or employability. Roasts target code habits, not identity, appearance, or personal circumstances.
+
+## Production note
+
+The included rate limiter is a bounded, process-local safety net. A public multi-instance deployment must replace it with an atomic distributed limiter, a durable result cache/single-flight lock, and a global model-spend budget before launch.

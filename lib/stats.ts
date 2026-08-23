@@ -26,11 +26,11 @@ export function calculateAverageCommitLength(commits: CommitSignal[]) {
   return Math.round(average(commits.map((commit) => commit.message.length)));
 }
 
-export function calculateReadmeCoverage(repos: GitHubRepo[], readmes: GitHubSnapshot["readmes"]) {
+export function calculateDescriptionCoverage(repos: GitHubRepo[]) {
   const originalRepos = repos.filter((repo) => !repo.fork);
   if (!originalRepos.length) return 0;
-  const readmeCount = readmes.filter((readme) => readme.hasReadme).length;
-  return Math.round((readmeCount / originalRepos.length) * 100);
+  const describedRepos = originalRepos.filter((repo) => Boolean(repo.description?.trim())).length;
+  return Math.round((describedRepos / originalRepos.length) * 100);
 }
 
 export function estimateTodoDensity(repos: GitHubRepo[], commits: CommitSignal[]) {
@@ -50,28 +50,7 @@ export function detectPatterns(repos: GitHubRepo[], commits: CommitSignal[]) {
   const noDescription = repos.filter((repo) => !repo.fork && !repo.description).length;
   const singleLanguage = unique(repos.map((repo) => repo.language).filter(Boolean)).length <= 1;
   const flavor = buildRepoFlavor({
-    username: "profile",
-    displayName: null,
-    avatarUrl: "",
-    githubUrl: "",
-    repoCount: repos.length,
-    inactiveRepos: inactive,
-    totalStars: repos.reduce((sum, repo) => sum + repo.stargazers_count, 0),
-    totalForks: repos.reduce((sum, repo) => sum + repo.forks_count, 0),
     languages: unique(repos.map((repo) => repo.language).filter(Boolean) as string[]),
-    avgCommitLength: Math.round(average(commits.map((commit) => commit.message.length))),
-    readmeCoverage: 0,
-    todoDensity: 0,
-    languageDiversityScore: 0,
-    shippingScore: 0,
-    consistencyScore: 0,
-    chaosScore: 0,
-    recentActivityCount: commits.filter((commit) => daysSince(commit.date) <= 90).length,
-    activityTimeline: [],
-    contributions: [],
-    totalContributions: 0,
-    topPatterns: [],
-    commitSamples: commits.map((commit) => commit.message).slice(0, 12),
     repos: repos.slice(0, 20).map((repo) => ({
       name: repo.name,
       description: repo.description,
@@ -95,15 +74,8 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const repos = snapshot.repos.filter((repo) => !repo.fork);
   const languages = unique(repos.map((repo) => repo.language).filter(Boolean) as string[]);
   const inactiveRepos = calculateInactiveRepos(repos);
-  const readmeCoverage = calculateReadmeCoverage(repos, snapshot.readmes);
-  const commitSignals =
-    snapshot.commits.length > 0
-      ? snapshot.commits
-      : snapshot.repos.slice(0, 12).map((repo) => ({
-          repo: repo.name,
-          message: `pushed ${repo.name}`,
-          date: repo.pushed_at ?? repo.updated_at
-        }));
+  const descriptionCoverage = calculateDescriptionCoverage(repos);
+  const commitSignals = snapshot.commits;
   const avgCommitLength = calculateAverageCommitLength(commitSignals);
   const todoDensity = estimateTodoDensity(repos, commitSignals);
   const recentActivityCount = snapshot.contributions.filter((day) => daysSince(day.date) <= 90).reduce((sum, day) => sum + day.count, 0);
@@ -113,47 +85,49 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const consistencyScore = clamp(Math.round((recentActivityCount / Math.max(snapshot.contributions.length, 1)) * 12), 8, 96);
   const languageDiversityScore = clamp(Math.round((languages.length / Math.max(repos.length, 1)) * 180), 10, 95);
   const chaosScore = clamp(
-    Math.round(100 - (readmeCoverage * 0.28 + shippingScore * 0.34 + consistencyScore * 0.22) + todoDensity * 0.42),
+    Math.round(100 - (descriptionCoverage * 0.28 + shippingScore * 0.34 + consistencyScore * 0.22) + todoDensity * 0.42),
     6,
     99
   );
   const sortedContributions = [...snapshot.contributions].sort((a, b) => a.date.localeCompare(b.date));
-  const recentContributions = sortedContributions.slice(Math.max(0, sortedContributions.length - 84));
-  const weeklyBuckets = Array.from({ length: 12 }, (_, index) => {
-    const slice = recentContributions.slice(index * 7, index * 7 + 7);
-    return {
-      label: slice[0]?.date ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(slice[0].date)) : `W${index + 1}`,
-      count: slice.reduce((sum, day) => sum + day.count, 0),
-      date: slice[0]?.date ?? ""
-    };
-  }).filter((bucket) => bucket.date || bucket.count > 0);
-
+  const accountAgeYears = snapshot.source === "github-api"
+    ? Math.max(0, Math.floor(daysSince(snapshot.profile.created_at) / 365.25))
+    : 0;
   return {
     username: snapshot.profile.login,
     displayName: snapshot.profile.name,
     avatarUrl: snapshot.profile.avatar_url,
     githubUrl: snapshot.profile.html_url,
+    followers: snapshot.profile.followers,
+    accountAgeYears,
     repoCount: snapshot.profile.public_repos,
+    analyzedRepoCount: repos.length,
+    sampledCommitCount: snapshot.commits.length,
+    dataSource: snapshot.source,
     inactiveRepos,
     totalStars,
     totalForks,
     languages,
     avgCommitLength,
-    readmeCoverage,
+    descriptionCoverage,
     todoDensity,
     languageDiversityScore,
     shippingScore,
     consistencyScore,
     chaosScore,
     recentActivityCount,
-    activityTimeline: weeklyBuckets,
     contributions: sortedContributions,
     totalContributions: sortedContributions.reduce((sum, day) => sum + day.count, 0),
     topPatterns: detectPatterns(repos, snapshot.commits),
-    commitSamples: commitSignals.map((commit) => commit.message).slice(0, 12),
+    commitSamples: commitSignals.map((commit) => commit.message.slice(0, 180)).slice(0, 12),
+    commitSignals: commitSignals.slice(0, 12).map((commit) => ({
+      repo: commit.repo.slice(0, 100),
+      message: commit.message.slice(0, 180),
+      date: commit.date
+    })),
     repos: repos.slice(0, 20).map((repo) => ({
       name: repo.name,
-      description: repo.description,
+      description: repo.description?.slice(0, 240) ?? null,
       language: repo.language,
       stars: repo.stargazers_count,
       pushedAt: repo.pushed_at

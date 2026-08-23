@@ -4,51 +4,85 @@
 
 :root {
   color-scheme: dark;
-  background: #0b0b0f;
+  background: #0d1117;
+  --canvas-default: #0d1117;
+  --canvas-subtle: #161b22;
+  --canvas-inset: #010409;
+  --border-default: #30363d;
+  --border-muted: #21262d;
+  --fg-default: #f0f6fc;
+  --fg-muted: #8b949e;
+  --accent-fg: #58a6ff;
+  --success-fg: #3fb950;
+  --danger-fg: #f85149;
+  --attention-fg: #d29922;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
   min-height: 100vh;
   margin: 0;
-  background: #0b0b0f;
-  color: #f8fafc;
-  /* Use the CSS variable injected by next/font; fall back to system-ui if unavailable. */
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
-  font-feature-settings: "rlig" 1, "calt" 1;
+  overflow-x: hidden;
+  background: var(--canvas-default);
+  color: var(--fg-default);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-::selection {
-  background: rgba(255, 92, 138, 0.35);
+button, input { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: var(--accent-fg); }
+::selection { background: rgba(56, 139, 253, 0.4); }
+:focus-visible { outline: 2px solid #1f6feb; outline-offset: 2px; }
+
+.mono-type {
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
 }
 
-.noise {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.16;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='.4'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
+.github-box {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--canvas-default);
 }
 
-.glass {
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  /* Removed backdrop-filter: blur — each blurred Card forces a GPU compositor layer.
-     With 8+ cards on the result page this causes compositor layer explosion and scroll
-     jank. Replaced with a near-opaque solid background that is visually identical. */
-  background: linear-gradient(145deg, rgba(23, 23, 28, 0.97), rgba(23, 23, 28, 0.93));
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.35);
+.github-box-header {
+  border-bottom: 1px solid var(--border-default);
+  border-radius: 6px 6px 0 0;
+  background: var(--canvas-subtle);
 }
 
-.card-gradient {
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
-    #17171c;
+.markdown-body h1,
+.markdown-body h2 {
+  margin: 0 0 16px;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-muted);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-body h1 { font-size: 2em; }
+.markdown-body h2 { margin-top: 28px; font-size: 1.5em; }
+.markdown-body p { margin: 0 0 16px; }
+.markdown-body code { font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace; }
+
+.octicon-spin { animation: octicon-spin 1s linear infinite; }
+.result-enter { animation: result-enter 240ms ease-out both; }
+
+@keyframes octicon-spin { to { transform: rotate(360deg); } }
+@keyframes result-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

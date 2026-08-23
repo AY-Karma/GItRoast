@@ -1,351 +1,345 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
+  BookOpen,
+  Check,
+  ChevronRight,
+  CircleDot,
+  Code2,
+  FileCode2,
   Flame,
+  GitBranch,
   Github,
-  GitPullRequest,
-  Loader2,
-  Sparkles,
-  TerminalSquare,
-  WandSparkles
+  History,
+  Info,
+  LockKeyhole,
+  Search,
+  Star,
+  Users
 } from "lucide-react";
-import Image from "next/image";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CommitChart } from "@/components/commit-chart";
-import { ScoreRing } from "@/components/score-ring";
-import { ShareCard } from "@/components/share-card";
+import dynamic from "next/dynamic";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import type { RoastResponse } from "@/lib/types";
-import { cn, compactNumber } from "@/lib/utils";
+
+const RoastReport = dynamic(
+  () => import("@/components/roast-report").then((module) => module.RoastReport),
+  { loading: () => <div className="mx-auto my-10 h-32 w-full max-w-[1216px] animate-pulse rounded-md border border-[#30363d] bg-[#161b22]" /> }
+);
 
 const examples = ["torvalds", "gaearon", "sindresorhus"];
-const loadingLines = [
-  "Reading commit history...",
-  "Finding questionable decisions...",
-  "Counting unfinished projects...",
-  "Consulting senior engineers...",
-  "Ignoring their advice...",
-  "Generating disappointment..."
-];
+const loadingSteps = [
+  "Fetching public profile and repositories",
+  "Reading the public activity timeline",
+  "Reviewing contribution activity",
+  "Writing an unnecessarily honest review"
+] as const;
 
-const reveal = {
-  hidden: { opacity: 0, y: 22 },
-  show: { opacity: 1, y: 0 }
-};
-
-// Full class strings are required so Tailwind's static scanner can include them in the
-// output bundle. Dynamically assembled fragments like "from-" + tone are never detected.
-const TONE_CLASSES: Record<"pink" | "violet" | "cyan", string> = {
-  pink: "from-pink to-white",
-  violet: "from-violet to-white",
-  cyan: "from-cyan to-white"
-};
-
-function MetricCard({
-  label,
-  value,
-  suffix = "",
-  tone = "pink"
-}: {
-  label: string;
-  value: number;
-  suffix?: string;
-  tone?: "pink" | "violet" | "cyan";
-}) {
-  return (
-    <Card className="p-5">
-      <div className="mb-4 text-sm font-semibold text-zinc-400">{label}</div>
-      <div className="text-4xl font-black tracking-normal">
-        {value}
-        {suffix}
-      </div>
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-        <motion.div
-          className={cn("h-full rounded-full bg-gradient-to-r", TONE_CLASSES[tone])}
-          initial={{ width: 0 }}
-          whileInView={{ width: `${Math.min(100, Math.max(6, value))}%` }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.9, ease: "easeOut" }}
-        />
-      </div>
-    </Card>
-  );
-}
-
-function LoadingStage() {
-  const [index, setIndex] = useState(0);
+function LoadingStage({ username }: { username: string }) {
+  const [step, setStep] = useState(0);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setIndex((current) => (current + 1) % loadingLines.length);
-    }, 1250);
+      setStep((current) => Math.min(current + 1, loadingSteps.length - 1));
+    }, 850);
     return () => window.clearInterval(interval);
   }, []);
 
   return (
-    <motion.div
-      className="mx-auto mt-10 max-w-xl rounded-[32px] border border-white/10 bg-white/[0.06] p-6 text-center shadow-glow"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16 }}
-    >
-      <Loader2 className="mx-auto mb-4 size-8 animate-spin text-cyan" />
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={loadingLines[index]}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          className="text-lg font-bold"
-        >
-          {loadingLines[index]}
-        </motion.div>
-      </AnimatePresence>
-    </motion.div>
+    <div className="github-box mt-4 overflow-hidden" role="status" aria-live="polite">
+      <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold">
+        <CircleDot className="size-4 text-[#d29922]" />
+        Analysis running for @{username}
+      </div>
+      <ol className="divide-y divide-[#21262d] px-4">
+        {loadingSteps.map((label, index) => (
+          <li key={label} className="flex items-center gap-3 py-3 text-sm">
+            {index < step ? (
+              <span className="grid size-5 place-items-center rounded-full bg-[#238636] text-white"><Check className="size-3.5" /></span>
+            ) : index === step ? (
+              <span className="size-5 rounded-full border-2 border-[#d29922] border-t-transparent octicon-spin" />
+            ) : (
+              <span className="size-5 rounded-full border border-[#30363d]" />
+            )}
+            <span className={index <= step ? "text-[#f0f6fc]" : "text-[#8b949e]"}>{label}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function RepositoryHeader() {
+  return (
+    <div className="border-b border-[#21262d] bg-[#0d1117]">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pt-5 md:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2 text-xl">
+            <BookOpen className="size-4 shrink-0 text-[#8b949e]" />
+            <a href="#main-content" className="truncate font-normal text-[#58a6ff] hover:underline">gitroast</a>
+            <span className="text-[#8b949e]">/</span>
+            <a href="#main-content" className="truncate font-semibold text-[#58a6ff] hover:underline">profile-review</a>
+            <span className="rounded-full border border-[#30363d] px-2 py-0.5 text-xs font-medium text-[#8b949e]">Public</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><Users className="size-4" /> Watch <span className="rounded-full bg-[#30363d] px-1.5">1.2k</span></span>
+            <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><Star className="size-4" /> Star <span className="rounded-full bg-[#30363d] px-1.5">8.4k</span></span>
+          </div>
+        </div>
+        <nav className="mt-5 flex gap-1 overflow-x-auto" aria-label="Repository navigation">
+          {[
+            [Code2, "Overview", true],
+            [Flame, "Roast report", false],
+            [Activity, "Activity", false],
+            [History, "History", false]
+          ].map(([Icon, label, active]) => {
+            const NavIcon = Icon as typeof Code2;
+            return (
+              <a
+                key={String(label)}
+                href={active ? "#main-content" : "#report"}
+                className={`flex h-10 shrink-0 items-center gap-2 border-b-2 px-3 text-sm text-[#c9d1d9] hover:bg-[#161b22] ${active ? "border-[#f78166] font-semibold" : "border-transparent"}`}
+              >
+                <NavIcon className="size-4 text-[#8b949e]" /> {String(label)}
+              </a>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+function FileList() {
+  const rows = [
+    ["profile.json", "Public profile and repository metadata", "just now"],
+    ["activity.log", "Recent public timeline commits", "just now"],
+    ["roast.md", "Generate the review nobody requested", "pending"]
+  ];
+
+  return (
+    <div className="github-box overflow-hidden">
+      <div className="github-box-header flex items-center justify-between px-4 py-3 text-xs">
+        <span className="flex items-center gap-2 font-semibold"><GitBranch className="size-4" /> main</span>
+        <span className="text-[#8b949e]">3 files</span>
+      </div>
+      <div className="divide-y divide-[#21262d]">
+        {rows.map(([name, message, time]) => (
+          <div key={name} className="grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(150px,.8fr)_1.3fr_auto] sm:items-center">
+            <span className="flex items-center gap-2 font-medium text-[#58a6ff]"><FileCode2 className="size-4 text-[#8b949e]" /> {name}</span>
+            <span className="truncate text-[#8b949e]">{message}</span>
+            <span className="text-xs text-[#8b949e]">{time}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
 export function RoastExperience() {
   const [username, setUsername] = useState("");
+  const [activeUsername, setActiveUsername] = useState("");
   const [result, setResult] = useState<RoastResponse | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+  const reportHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  // Wrapped in useCallback so the stable reference can be listed in the useEffect
-  // dependency array without triggering infinite re-renders.
-  const submit = useCallback(async (value: string) => {
-    const clean = value.trim();
-    if (!clean) return;
+  const submit = useCallback(async (rawValue: string) => {
+    const clean = rawValue.trim().replace(/^@/, "");
+    if (!/^[a-zA-Z0-9-]{1,39}$/.test(clean)) {
+      setError("Enter a valid GitHub username using letters, numbers, or hyphens.");
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = ++requestIdRef.current;
+    setUsername(clean);
+    setActiveUsername(clean);
     setIsLoading(true);
     setError("");
-    setResult(null);
+    void import("@/components/roast-report");
 
     try {
       const response = await fetch("/api/roast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: clean })
+        body: JSON.stringify({ username: clean }),
+        signal: controller.signal
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Unable to roast this profile.");
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = payload && typeof payload === "object" && "error" in payload
+          ? String((payload as { error: unknown }).error)
+          : "GitHub did not return a usable profile.";
+        throw new Error(message);
+      }
+      if (requestId !== requestIdRef.current) return;
       setResult(payload as RoastResponse);
-      history.replaceState(null, "", `?u=${encodeURIComponent(clean)}`);
-      setTimeout(() => document.getElementById("report")?.scrollIntoView({ behavior: "smooth" }), 150);
+      window.history.replaceState(null, "", `?u=${encodeURIComponent(clean)}`);
+      window.setTimeout(() => {
+        document.getElementById("report")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        reportHeadingRef.current?.focus({ preventScroll: true });
+      }, 120);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to roast this profile.");
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
+      if (requestId === requestIdRef.current) {
+        setError(caught instanceof Error ? caught.message : "GitHub did not return a usable profile.");
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const user = params.get("u");
-    if (user) {
-      setUsername(user);
-      void submit(user);
-    }
-  }, [submit]);
+    const sharedUsername = new URLSearchParams(window.location.search).get("u");
+    const prefillTimer = sharedUsername && /^[a-zA-Z0-9-]{1,39}$/.test(sharedUsername)
+      ? window.setTimeout(() => setUsername(sharedUsername), 0)
+      : undefined;
+    return () => {
+      if (prefillTimer) window.clearTimeout(prefillTimer);
+      abortRef.current?.abort();
+    };
+  }, []);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void submit(username);
+    if (!isLoading) void submit(username);
   }
 
-  const stats = useMemo(() => {
-    if (!result) return [];
-    return [
-      { label: "Projects Started", value: result.summary.repoCount, suffix: "", tone: "pink" as const },
-      {
-        label: "Projects Finished",
-        value: result.summary.shippingScore,
-        suffix: "%",
-        tone: "cyan" as const
-      },
-      { label: "TODO Density", value: result.summary.todoDensity, suffix: "%", tone: "violet" as const },
-      { label: "README Confidence", value: result.summary.readmeCoverage, suffix: "%", tone: "cyan" as const },
-      { label: "Architecture Ego", value: Math.min(99, result.summary.languageDiversityScore + 18), suffix: "%", tone: "pink" as const },
-      { label: "Bug Attraction Rate", value: result.summary.chaosScore, suffix: "%", tone: "violet" as const }
-    ];
-  }, [result]);
+  function reset() {
+    abortRef.current?.abort();
+    setResult(null);
+    setError("");
+    setIsLoading(false);
+    window.history.replaceState(null, "", window.location.pathname);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => document.getElementById("username")?.focus(), 200);
+  }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-background bg-radial-stage text-white">
-      <div className="noise" />
-      <section className="relative mx-auto flex min-h-[92vh] w-full max-w-6xl flex-col justify-center px-4 py-12 md:px-6">
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{
-            hidden: {},
-            show: { transition: { staggerChildren: 0.06 } }
-          }}
-          className="relative z-10"
-        >
-          <motion.div variants={reveal} className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-200">
-            <Sparkles className="size-4 text-pink" />
-            GitRoast
-          </motion.div>
-          <motion.h1 variants={reveal} className="max-w-5xl text-6xl font-black leading-[0.92] tracking-normal sm:text-7xl lg:text-8xl">
-            Your GitHub has been talking behind your back.
-          </motion.h1>
-          <motion.p variants={reveal} className="mt-6 max-w-2xl text-xl leading-8 text-zinc-300 md:text-2xl">
-            Get a brutally honest AI performance review of your coding habits.
-          </motion.p>
-          <motion.form variants={reveal} onSubmit={onSubmit} className="mt-10 max-w-2xl rounded-[32px] border border-white/10 bg-[#17171C]/80 p-3 shadow-glow backdrop-blur-2xl">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label className="sr-only" htmlFor="username">
-                GitHub username
-              </label>
-              <div className="flex min-h-14 flex-1 items-center gap-3 rounded-full bg-black/25 px-5">
-                <Github className="size-5 text-zinc-400" />
-                <input
-                  id="username"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="GitHub username"
-                  className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-white outline-none placeholder:text-zinc-500"
-                />
-              </div>
-              <Button disabled={isLoading} className="min-h-14">
-                <Flame className="size-5" />
-                Roast My GitHub
-              </Button>
+    <main id="main-content" className="min-h-screen bg-[#0d1117] text-[#f0f6fc]">
+      <header className="border-b border-[#21262d] bg-[#010409]">
+        <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center gap-3 px-4 md:px-8">
+          <a href="#main-content" aria-label="GitRoast home" className="text-[#f0f6fc]"><Github className="size-8" fill="currentColor" /></a>
+          <div className="h-6 w-px bg-[#30363d]" />
+          <span className="font-semibold text-[#f0f6fc]">GitRoast</span>
+          <span className="hidden rounded-full border border-[#30363d] px-2 py-0.5 text-xs text-[#8b949e] sm:inline">Unofficial</span>
+          <div className="ml-auto hidden items-center gap-2 text-xs text-[#8b949e] md:flex"><LockKeyhole className="size-3.5" /> Public GitHub data only</div>
+        </div>
+      </header>
+
+      <RepositoryHeader />
+
+      <div className="mx-auto grid w-full max-w-[1216px] gap-8 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_296px]">
+        <div className="min-w-0 space-y-4">
+          <FileList />
+
+          <section className="github-box overflow-hidden" aria-labelledby="readme-title">
+            <div className="github-box-header flex items-center gap-2 px-4 py-3 text-xs font-semibold">
+              <BookOpen className="size-4 text-[#8b949e]" /> README.md
             </div>
-          </motion.form>
-          <motion.div variants={reveal} className="mt-4 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
-            <span>Try:</span>
-            {examples.map((example) => (
-              <button
-                key={example}
-                type="button"
-                className="rounded-full border border-white/10 px-3 py-1 font-semibold text-zinc-200 transition hover:border-cyan/50 hover:text-cyan"
-                onClick={() => {
-                  setUsername(example);
-                  void submit(example);
-                }}
-              >
-                {example}
-              </button>
-            ))}
-          </motion.div>
-          {error ? <div className="mt-5 max-w-2xl rounded-3xl border border-pink/40 bg-pink/10 p-4 text-sm font-semibold text-pink">{error}</div> : null}
-          <AnimatePresence>{isLoading ? <LoadingStage /> : null}</AnimatePresence>
-        </motion.div>
-      </section>
+            <div className="markdown-body p-5 sm:p-8">
+              <h1 id="readme-title">Roast your GitHub profile</h1>
+              <p className="max-w-2xl text-base text-[#c9d1d9]">
+                Enter a public username. GitRoast reviews repository activity, recent public commits, project descriptions, and contribution habits—then writes the code review your teammates were too polite to leave.
+              </p>
 
-      {result ? (
-        <motion.div
-          id="report"
-          initial="hidden"
-          animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}
-          className="relative z-10"
-        >
-          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-[1fr_auto] md:px-6">
-            <Card className="flex h-full flex-col gap-8 overflow-hidden p-6 sm:p-8 md:flex-row md:items-center">
-              <Image
-                src={result.summary.avatarUrl}
-                alt={`${result.summary.username} avatar`}
-                width={136}
-                height={136}
-                className="size-32 rounded-[28px] border border-white/10 object-cover shadow-card"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="mb-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-zinc-400">
-                  <span>@{result.summary.username}</span>
-                  <span>{compactNumber(result.summary.totalStars)} stars</span>
-                  <span>{compactNumber(result.summary.totalForks)} forks</span>
-                </div>
-                <h2 className="text-4xl font-black tracking-normal md:text-6xl break-words">{result.report.developerType}</h2>
-                <p className="mt-4 max-w-2xl text-lg leading-8 text-zinc-300 break-words">{result.report.archetypeDescription}</p>
-              </div>
-            </Card>
-            <Card className="grid h-full place-items-center p-6">
-              <ScoreRing value={result.report.roastScore} />
-            </Card>
-          </motion.section>
-
-          <motion.section variants={reveal} className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
-            <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-pink/24 via-violet/18 to-cyan/16 p-8 shadow-glow sm:p-12">
-              <WandSparkles className="mb-8 size-10 text-cyan" />
-              <p className="max-w-5xl text-4xl font-black leading-tight tracking-normal md:text-6xl break-words">{result.report.roast}</p>
-              <div className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-zinc-300">
-                Generated with {result.generatedWith === "openai" ? "AI" : "local fallback"}
-              </div>
-            </div>
-          </motion.section>
-
-          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl items-stretch gap-6 px-4 py-8 md:grid-cols-[.92fr_1.08fr] md:px-6">
-            <Card className="flex h-full flex-col justify-center gap-4 p-7">
-              <div className="mb-1 flex items-center gap-2">
-                <TerminalSquare className="size-5 text-pink" />
-                <span className="text-sm font-bold text-zinc-300">Coding Snapshot</span>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Primary repo</div>
-                {result.summary.repos[0] ? (
-                  <a
-                    href={`https://github.com/${result.summary.username}/${result.summary.repos[0].name}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 block break-all text-base font-black text-cyan underline-offset-2 hover:underline"
-                  >
-                    {result.summary.repos[0].name}
-                  </a>
-                ) : (
-                  <div className="mt-2 text-base font-black text-zinc-300">mystery</div>
-                )}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Recent streak</div>
-                <div className="mt-2 text-xl font-black">{result.summary.recentActivityCount}</div>
-              </div>
-            </Card>
-            <CommitChart summary={result.summary} />
-          </motion.section>
-
-          <motion.section variants={reveal} className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-8 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
-            {stats.map((stat) => (
-              <MetricCard key={stat.label} {...stat} />
-            ))}
-          </motion.section>
-
-          <motion.section variants={reveal} className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
-            <Card className="p-7">
-              <GitPullRequest className="mb-5 size-9 text-violet" />
-              <h2 className="text-3xl font-black tracking-normal">Commit Crimes</h2>
-              <div className="mt-6 grid gap-4">
-                {result.report.commitCrimes.map((crime, index) => (
-                  <div key={`${crime.message}-${index}`} className="grid md:grid-cols-[.6fr_1fr] rounded-3xl border border-white/10 bg-black/20 overflow-hidden">
-                    <a
-                      href={`https://github.com/search?q=author%3A${encodeURIComponent(result.summary.username)}+${encodeURIComponent(crime.message)}&type=commits`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-start p-5 hover:bg-white/[0.04] transition-colors"
-                    >
-                      <code className="break-words font-mono text-sm text-cyan">{crime.message}</code>
-                    </a>
-                    <div className="flex items-start border-t border-white/10 p-5 md:border-l md:border-t-0">
-                      <p className="font-semibold leading-7 text-zinc-200 break-words">{crime.commentary}</p>
-                    </div>
+              <form id="roast-form" onSubmit={onSubmit} className="mt-6 max-w-2xl" aria-describedby="form-note form-error">
+                <label htmlFor="username" className="mb-2 block font-semibold">GitHub username</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex min-h-10 flex-1 items-center rounded-md border border-[#30363d] bg-[#010409] px-3 shadow-inner focus-within:border-[#58a6ff] focus-within:ring-1 focus-within:ring-[#58a6ff]">
+                    <span className="mr-1 text-[#8b949e]">github.com/</span>
+                    <input
+                      id="username"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      placeholder="username"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      spellCheck={false}
+                      maxLength={40}
+                      aria-invalid={Boolean(error)}
+                      className="min-w-0 flex-1 bg-transparent text-[#f0f6fc] outline-none placeholder:text-[#484f58]"
+                    />
                   </div>
+                  <Button type="submit" disabled={isLoading} className="h-10 px-4">
+                    <Flame className="size-4" /> {isLoading ? "Analyzing…" : "Roast profile"}
+                  </Button>
+                </div>
+                <p id="form-note" className="mt-2 flex items-start gap-2 text-xs text-[#8b949e]">
+                  <Info className="mt-0.5 size-3.5 shrink-0" /> No sign-in and no private repository access. Selected public signals may be sent to the configured AI provider.
+                </p>
+                {error ? (
+                  <div id="form-error" role="alert" className="mt-4 rounded-md border border-[rgba(248,81,73,.4)] bg-[rgba(248,81,73,.1)] px-4 py-3 text-sm text-[#ff7b72]">
+                    <strong>Analysis failed.</strong> {error}
+                  </div>
+                ) : null}
+                {isLoading ? <LoadingStage username={activeUsername} /> : null}
+              </form>
+
+              <h2>Try an example</h2>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {examples.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-1 font-medium text-[#58a6ff] hover:underline disabled:opacity-50"
+                    onClick={() => void submit(example)}
+                  >
+                    <Search className="size-3.5" /> @{example}
+                  </button>
                 ))}
               </div>
-            </Card>
-          </motion.section>
+            </div>
+          </section>
+        </div>
 
-          <motion.div variants={reveal}>
-            <ShareCard result={result} />
-          </motion.div>
-        </motion.div>
-      ) : null}
+        <aside className="space-y-6 text-sm" aria-label="About GitRoast">
+          <section>
+            <h2 className="mb-3 font-semibold text-[#f0f6fc]">About</h2>
+            <p className="leading-6 text-[#c9d1d9]">A public GitHub profile reviewer with a slightly hostile sense of humor.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["github", "developer-tools", "roast", "open-source"].map((topic) => <span key={topic} className="rounded-full bg-[rgba(56,139,253,.15)] px-2.5 py-1 text-xs font-medium text-[#58a6ff]">{topic}</span>)}
+            </div>
+          </section>
+          <div className="border-t border-[#21262d] pt-4">
+            <h2 className="mb-3 font-semibold">How it works</h2>
+            <ol className="space-y-3 text-[#8b949e]">
+              {["Collect bounded public signals", "Calculate transparent heuristics", "Generate a code-habits-only roast"].map((item, index) => (
+                <li key={item} className="flex gap-2"><span className="text-[#3fb950]">{index + 1}.</span><span>{item}</span></li>
+              ))}
+            </ol>
+          </div>
+          <div className="border-t border-[#21262d] pt-4">
+            <h2 className="mb-3 font-semibold">Languages</h2>
+            <div className="mb-3 flex h-2 overflow-hidden rounded-full bg-[#21262d]">
+              <span className="w-[56%] bg-[#3178c6]" /><span className="w-[25%] bg-[#f1e05a]" /><span className="w-[19%] bg-[#e34c26]" />
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#3178c6]" />TypeScript</span><span className="text-[#8b949e]">56%</span></div>
+              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#f1e05a]" />JavaScript</span><span className="text-[#8b949e]">25%</span></div>
+              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#e34c26]" />HTML</span><span className="text-[#8b949e]">19%</span></div>
+            </div>
+          </div>
+          <div className="border-t border-[#21262d] pt-4 text-xs text-[#8b949e]">
+            <a href="#methodology" className="flex items-center justify-between hover:underline">Methodology <ChevronRight className="size-4" /></a>
+          </div>
+        </aside>
+      </div>
 
-      <footer className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-10 text-sm text-zinc-500 md:px-6">
-        <span>GitRoast</span>
-        <span>Roasts code, not people.</span>
+      {result ? <RoastReport result={result} headingRef={reportHeadingRef} onReset={reset} /> : null}
+
+      <footer className="mt-10 border-t border-[#21262d]">
+        <div className="mx-auto flex w-full max-w-[1216px] flex-col gap-3 px-4 py-8 text-xs text-[#8b949e] sm:flex-row sm:items-center sm:justify-between md:px-6">
+          <span className="flex items-center gap-2"><Github className="size-5" /> GitRoast is not affiliated with GitHub.</span>
+          <span>Roasts code and public work—not people.</span>
+        </div>
       </footer>
     </main>
   );

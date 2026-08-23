@@ -29,11 +29,6 @@ export type GitHubRepo = {
   default_branch: string;
 };
 
-export type RepoReadmeSignal = {
-  repo: string;
-  hasReadme: boolean;
-};
-
 export type CommitSignal = {
   repo: string;
   message: string;
@@ -50,8 +45,8 @@ export type GitHubSnapshot = {
   profile: GitHubProfile;
   repos: GitHubRepo[];
   commits: CommitSignal[];
-  readmes: RepoReadmeSignal[];
   contributions: ContributionDay[];
+  source: "github-api" | "public-profile";
 };
 
 export type RoastSummary = {
@@ -59,28 +54,29 @@ export type RoastSummary = {
   displayName: string | null;
   avatarUrl: string;
   githubUrl: string;
+  followers: number;
+  accountAgeYears: number;
   repoCount: number;
+  analyzedRepoCount: number;
+  sampledCommitCount: number;
+  dataSource: GitHubSnapshot["source"];
   inactiveRepos: number;
   totalStars: number;
   totalForks: number;
   languages: string[];
   avgCommitLength: number;
-  readmeCoverage: number;
+  descriptionCoverage: number;
   todoDensity: number;
   languageDiversityScore: number;
   shippingScore: number;
   consistencyScore: number;
   chaosScore: number;
   recentActivityCount: number;
-  activityTimeline: Array<{
-    label: string;
-    count: number;
-    date: string;
-  }>;
   contributions: ContributionDay[];
   totalContributions: number;
   topPatterns: string[];
   commitSamples: string[];
+  commitSignals: CommitSignal[];
   repos: Array<{
     name: string;
     description: string | null;
@@ -90,6 +86,12 @@ export type RoastSummary = {
   }>;
 };
 
+export type RoastReceipt = {
+  title: string;
+  evidence: string;
+  punchline: string;
+};
+
 export type RoastReport = {
   developerType: string;
   archetypeDescription: string;
@@ -97,9 +99,12 @@ export type RoastReport = {
   roast: string;
   strengths: string[];
   weaknesses: string[];
+  receipts: RoastReceipt[];
+  redemption: string;
   commitCrimes: Array<{
     message: string;
     commentary: string;
+    status: "approved" | "changes-requested";
   }>;
 };
 

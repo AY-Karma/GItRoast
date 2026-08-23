@@ -1,4 +1,4 @@
- Next.js build output
+# Next.js build output
 .next/
 out/
 dist/
@@ -8,8 +8,8 @@ next-env.d.ts
 node_modules/
 
 # Environment variables
-.env
-.env*.local
+.env*
+!.env.example
 
 # TypeScript
 *.tsbuildinfo

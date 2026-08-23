@@ -1,4 +1,6 @@
-import type { RoastSummary } from "@/lib/types";
+import type { RoastReceipt, RoastSummary } from "@/lib/types";
+
+type RepoFlavorSummary = Pick<RoastSummary, "languages" | "repos">;
 
 function titleCase(input: string) {
   return input
@@ -8,28 +10,63 @@ function titleCase(input: string) {
     .join(" ");
 }
 
-function takeRepoNames(summary: RoastSummary) {
-  return summary.repos
-    .map((repo) => repo.name)
-    .filter(Boolean)
-    .slice(0, 6)
-    .map(titleCase);
+function cleanSnippet(input: string, maxLength = 88) {
+  const clean = input.replace(/\s+/g, " ").trim();
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 1)}…` : clean;
 }
 
-function takeRepoDescriptions(summary: RoastSummary) {
+function isVagueCommit(message: string) {
+  const compact = message.trim().toLowerCase();
+  return compact.length <= 18 || /^(fix|fixed|update|updated|changes|misc|stuff|wip|temp|final|cleanup)[.!]?$/.test(compact);
+}
+
+export function commitReviewStatus(message: string): "approved" | "changes-requested" {
+  return isVagueCommit(message) ? "changes-requested" : "approved";
+}
+
+function stableHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function roastFingerprint(summary: RoastSummary) {
+  return [
+    summary.username.toLowerCase(),
+    summary.repoCount,
+    summary.inactiveRepos,
+    summary.descriptionCoverage,
+    summary.shippingScore,
+    summary.repos.map((repo) => repo.name).join("|"),
+    summary.commitSamples.join("|")
+  ].join(":");
+}
+
+function choose<T>(summary: RoastSummary, salt: string, options: readonly T[]) {
+  return options[stableHash(`${roastFingerprint(summary)}:${salt}`) % options.length];
+}
+
+function takeRepoNames(summary: RepoFlavorSummary) {
+  return summary.repos.map((repo) => repo.name.trim()).filter(Boolean).slice(0, 6);
+}
+
+function takeRepoDescriptions(summary: RepoFlavorSummary) {
   return summary.repos
     .map((repo) => repo.description?.trim())
     .filter((description): description is string => Boolean(description))
     .slice(0, 4);
 }
 
-function languageBlend(summary: RoastSummary) {
-  if (!summary.languages.length) return "mysterious stack discipline";
-  if (summary.languages.length === 1) return `${summary.languages[0]} tunnel vision`;
-  return `${summary.languages.slice(0, 3).join(", ")} fluency with zero respect for boundaries`;
+function languageBlend(summary: RepoFlavorSummary) {
+  if (!summary.languages.length) return "mysterious-stack";
+  if (summary.languages.length === 1) return summary.languages[0];
+  return summary.languages.slice(0, 3).join(" + ");
 }
 
-export function buildRepoFlavor(summary: RoastSummary) {
+export function buildRepoFlavor(summary: RepoFlavorSummary) {
   const repoNames = takeRepoNames(summary);
   const repoDescriptions = takeRepoDescriptions(summary);
   const primaryRepo = repoNames[0] ?? "the public backlog";
@@ -46,225 +83,181 @@ export function buildRepoFlavor(summary: RoastSummary) {
   };
 }
 
+export function repoAwareDeveloperType(summary: RoastSummary) {
+  const flavor = buildRepoFlavor(summary);
+  const subject = flavor.primaryRepo === "the public backlog" ? summary.username : flavor.primaryRepo;
+  const role = choose(summary, "developer-type", [
+    "Branch Whisperer",
+    "Release Archaeologist",
+    "Side-Quest Maintainer",
+    "Diff Cartographer",
+    "README Negotiator",
+    "Hotfix Historian",
+    "Merge Queue Romantic",
+    "Refactor Curator"
+  ] as const);
+  return `${titleCase(subject).slice(0, 34)} ${role}`;
+}
+
 export function repoAwareRoast(summary: RoastSummary) {
   const flavor = buildRepoFlavor(summary);
-  return `${summary.username} has a GitHub that reads like a split personality between ${flavor.primaryRepo}, ${flavor.secondaryRepo}, and ${flavor.languageBlend}. The repos are doing the talking, and most of them are asking for a cleanup PR that never arrived.`;
+  const repoSetup = summary.inactiveRepos > 0
+    ? choose(summary, "inactive-setup", [
+        `@${summary.username}'s profile has ${summary.repoCount} public repos, and ${summary.inactiveRepos} of the sampled originals have quietly entered long-term support.`,
+        `${summary.repoCount} public repos made the roll call; ${summary.inactiveRepos} answered with an out-of-office message dated over a year ago.`,
+        `The repository list is ${summary.repoCount} projects deep, with ${summary.inactiveRepos} sampled repos currently majoring in historical preservation.`
+      ] as const)
+    : `All ${summary.analyzedRepoCount} sampled original repos still show signs of life, which is suspiciously responsible behavior for GitHub.`;
+  const projectLine = choose(summary, "project-line", [
+    `${flavor.primaryRepo} is carrying the main plot while ${flavor.secondaryRepo} keeps asking whether this is a product roadmap or a very committed side quest.`,
+    `${flavor.primaryRepo} has the confident name; ${flavor.secondaryRepo} has the energy of a tab that has been open since Tuesday.`,
+    `Between ${flavor.primaryRepo} and ${flavor.secondaryRepo}, the ${flavor.languageBlend} stack is less a technology choice and more a group chat.`
+  ] as const);
+  const commit = summary.commitSamples[0];
+  const commitLine = commit
+    ? choose(summary, "commit-line", [
+        `Then the commit subject “${cleanSnippet(commit)}” arrived and declined to provide an alibi.`,
+        `The commit log contributed “${cleanSnippet(commit)}”, a complete sentence only in the legal sense.`,
+        `A recent push was labelled “${cleanSnippet(commit)}”, which is exactly the amount of context future-you apparently deserved.`
+      ] as const)
+    : `The public commit trail brought no subjects to the hearing, so the repo names had to do all the comedic labor.`;
+
+  return `${repoSetup} ${projectLine} ${commitLine}`;
 }
 
 export function repoAwareArchetype(summary: RoastSummary) {
   const flavor = buildRepoFlavor(summary);
-  return `A developer whose public universe revolves around ${flavor.primaryRepo} and whatever side quest became ${flavor.secondaryRepo}. The stack choices are bold, the naming is personal, and the repo list has the energy of a very committed draft folder.`;
+  const activity = summary.recentActivityCount > 0
+    ? `${summary.recentActivityCount} visible contributions in the recent window`
+    : "a contribution graph practicing minimalism";
+  return choose(summary, "archetype", [
+    `A ${flavor.languageBlend} builder whose public universe revolves around ${flavor.primaryRepo}, ${flavor.secondaryRepo}, and ${activity}. The work is real; the filing system has improv energy.`,
+    `Part maintainer, part side-quest curator: ${flavor.primaryRepo} gets the spotlight, ${flavor.secondaryRepo} gets the sequel tease, and the graph supplies ${activity}.`,
+    `A public-work catalog powered by ${flavor.languageBlend}, anchored by ${flavor.primaryRepo}, and held together by the optimistic belief that every repo can become the main repo.`
+  ] as const);
 }
 
 export function repoAwareStrengths(summary: RoastSummary) {
   const flavor = buildRepoFlavor(summary);
-  const repoNames = flavor.repoNames;
+  const primary = summary.repos[0];
   return [
-    repoNames[0] ? `Gives ${repoNames[0]} real main-character energy` : "Starts with enough conviction to create momentum",
-    repoNames[1] ? `Can make ${repoNames[1]} sound like a product instead of a weekend decision` : "Explores ideas quickly and with confidence",
+    primary?.stars
+      ? `${flavor.primaryRepo} earned ${primary.stars.toLocaleString("en-US")} stars, so the internet has signed at least one approval review`
+      : `${flavor.primaryRepo} gives the profile a recognizable main branch`,
+    summary.totalContributions > 0
+      ? `${summary.totalContributions.toLocaleString("en-US")} visible contributions prove this is shipping history, not just repo-name fan fiction`
+      : `Keeps the public work focused enough that the signal is easy to read`,
+    summary.languages.length > 1
+      ? `Moves between ${summary.languages.slice(0, 3).join(", ")} without making the language list look accidental`
+      : `Shows a clear point of view in ${summary.languages[0] ?? "the chosen stack"}`,
     flavor.repoDescriptions[0]
-      ? `Some repos actually explain themselves: "${flavor.repoDescriptions[0]}"`
-      : "Knows when a repo needs a name with actual personality",
-    `Comfortable shipping across ${summary.languages.length ? summary.languages.join(" and ") : "whatever language showed up"}`
+      ? `${flavor.primaryRepo} explains its purpose instead of making visitors reverse-engineer the elevator pitch`
+      : `The strongest projects have enough identity to survive a missing tagline`
   ].slice(0, 4);
 }
 
 export function repoAwareWeaknesses(summary: RoastSummary) {
   const flavor = buildRepoFlavor(summary);
+  const vagueCommit = summary.commitSamples.find(isVagueCommit);
   return [
-    flavor.repoNames[0]
-      ? `${flavor.primaryRepo} sounds like it was renamed at least twice in a moment of optimism`
-      : "Names occasionally feel like they were chosen under duress",
     summary.inactiveRepos > 0
-      ? `${summary.inactiveRepos} repos are still waiting for a sequel nobody scheduled`
-      : "A few more finish lines would make the whole story louder",
-    summary.readmeCoverage < 60
-      ? "Several repos are running on vibes where documentation should be"
-      : "The READMEs are trying, but the repos still have secrets",
-    summary.avgCommitLength <= 14
-      ? "Commit messages sometimes behave like texted apologies"
-      : "Commit messages explain just enough to be suspicious"
+      ? `${summary.inactiveRepos} sampled repos need an archive badge, a status note, or a very small retirement party`
+      : `The active repo list could still use clearer “start here” signposts`,
+    summary.descriptionCoverage < 70
+      ? `Only ${summary.descriptionCoverage}% of sampled original repos have descriptions; several projects are relying on telepathy`
+      : `${summary.descriptionCoverage}% description coverage is solid, but ${flavor.secondaryRepo} can still tell visitors what success looks like`,
+    vagueCommit
+      ? `“${cleanSnippet(vagueCommit)}” could use one noun explaining what changed and one clue explaining why`
+      : summary.commitSamples.length
+        ? `The commit subjects are annoyingly clear; mirror that context in the quieter repository descriptions`
+        : `No public commit subjects were available, leaving the review timeline dramatically under-captioned`,
+    `${flavor.primaryRepo} deserves a crisp status section so the main project does not have to explain the whole profile alone`
   ].slice(0, 4);
 }
 
-// Deterministic rotation helper — picks a stable index from a string so two commits
-// of the same vibe category don't always land on the exact same line.
-function stableIndex(seed: string, poolSize: number) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return hash % poolSize;
+export function repoAwareReceipts(summary: RoastSummary): RoastReceipt[] {
+  const flavor = buildRepoFlavor(summary);
+  const commit = summary.commitSamples[0];
+  return [
+    {
+      title: "Repository archaeology",
+      evidence: `${summary.inactiveRepos} of ${summary.analyzedRepoCount} sampled original repos have been quiet for over a year.`,
+      punchline: choose(summary, "receipt-repos", [
+        `${flavor.secondaryRepo} is not abandoned; it is preserving the exact moment the weekend ended.`,
+        `That is less a backlog and more a carefully indexed fossil record.`,
+        `The archive button has started drafting its own pull request.`
+      ] as const)
+    },
+    {
+      title: "Commit message exhibit",
+      evidence: commit ? `Recent public subject: “${cleanSnippet(commit)}”` : "No recent public commit subjects were exposed by the profile.",
+      punchline: commit
+        ? isVagueCommit(commit)
+          ? choose(summary, "receipt-commit-vague", [
+              `Future maintainers have been given a clue, but it is the sort found in an escape room.`,
+              `Technically searchable, spiritually a shrug.`,
+              `The diff knows what happened and has chosen not to testify.`
+            ] as const)
+          : choose(summary, "receipt-commit-clear", [
+              `Annoyingly defensible. The prosecution has moved on to the repository descriptions.`,
+              `This subject brought context, intent, and punctuation. Very inconsiderate to the roast.`,
+              `The commit message has receipts; the roast withdraws this charge without prejudice.`
+            ] as const)
+        : `The activity graph was present, but the commit captions invoked their right to remain silent.`
+    },
+    {
+      title: "Documentation checksum",
+      evidence: `${summary.descriptionCoverage}% description coverage across sampled original repositories.`,
+      punchline: choose(summary, "receipt-docs", [
+        `${flavor.primaryRepo} has a name; the quieter repos are still waiting for their one-sentence origin story.`,
+        `Visitors should not need repository forensics before deciding where to click.`,
+        `A README is documentation. A mysterious repo name is merely atmosphere.`
+      ] as const)
+    }
+  ];
+}
+
+export function repoAwareRedemption(summary: RoastSummary) {
+  const flavor = buildRepoFlavor(summary);
+  const commitAdvice = summary.commitSamples[0]
+    ? `give the next commit subject one clear “what” and one useful “why”`
+    : "surface one recent change with a descriptive commit subject";
+  return `Start with ${flavor.primaryRepo}: add a crisp status note, label or archive one quiet side quest, and ${commitAdvice}. Same personality, much easier archaeology.`;
 }
 
 export function repoAwareCommitCommentary(summary: RoastSummary, message: string) {
   const flavor = buildRepoFlavor(summary);
+  const signal = summary.commitSignals.find((commit) => commit.message === message);
+  const repo = signal?.repo ?? flavor.primaryRepo;
   const lower = message.toLowerCase();
-  const trimmed = message.trim();
 
-  // ── 1. README / docs ──────────────────────────────────────────────────────
-  if (/readme|docs?(?!\w)|documentation|changelog|licence|license/.test(lower)) {
-    const lines = [
-      `Updating the README without touching the code is the literary equivalent of rearranging furniture while ${flavor.primaryRepo} is on fire.`,
-      `A documentation commit. The bravest thing ${flavor.primaryRepo} has seen all week, and simultaneously the least load-bearing.`,
-      `Someone remembered the README existed. This happens roughly as often as a solar eclipse.`,
-      `The docs changed. The code did not. ${flavor.primaryRepo} is now better described and equally broken.`
-    ];
-    return lines[stableIndex(message, lines.length)];
+  if (!isVagueCommit(message) && message.length >= 44) {
+    return choose(summary, `commit-specific:${message}`, [
+      `This is annoyingly specific. The roast tried to object, but ${repo} brought receipts.`,
+      `${repo} supplied context, intent, and a useful noun. The prosecution reluctantly marks this one approved.`,
+      `A genuinely useful subject from ${repo}; it has ruined an otherwise promising commit-message allegation.`
+    ] as const);
   }
 
-  // ── 2. Typo / spelling ────────────────────────────────────────────────────
-  if (/typo|speling|speeling|misspell|grammer|gramm?ati|wording|phrasing/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `The grammar police raided ${flavor.primaryRepo} and this commit is the plea deal. The code still has no comment.`
-      : "Fixing a typo is a valid contribution. Whether it was the most urgent issue is a whole separate trial.";
-  }
-
-  // ── 3. "final" version ────────────────────────────────────────────────────
   if (/final/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `${flavor.primaryRepo} is carrying the emotional weight of this "final" version, which looks suspiciously like version 4.`
-      : "The word final is doing way too much freelance work here.";
+    return `${repo} has accepted “final” as a temporary branch of philosophy. The diff may be done; the title is leaving room for a sequel.`;
   }
-
-  // ── 4. Revert ─────────────────────────────────────────────────────────────
-  if (/^revert/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `Reverting a commit in ${flavor.primaryRepo} is the engineering equivalent of saying "never mind" in a very loud room full of very patient colleagues.`
-      : "A revert. The git log's way of admitting the previous commit had unresolved feelings.";
+  if (/fix/.test(lower)) {
+    return choose(summary, `commit-fix:${message}`, [
+      `${repo} received a fix with the confidence of an emergency patch and the biography of a sticky note.`,
+      `The good news: ${repo} got fixed. The mystery: future-you still has to discover what negotiated the ceasefire.`,
+      `${repo} is healthier now; the commit log would like credit without discussing the incident.`
+    ] as const);
   }
-
-  // ── 5. Merge commit ───────────────────────────────────────────────────────
-  if (/^merge(?:d|ing)?[\s:]/.test(lower) || /merge (branch|pull request|pr)\b/.test(lower)) {
-    return flavor.repoNames[1]
-      ? `Two branches walk into ${flavor.secondaryRepo}. One of them had conflicts. They both pretend they didn't.`
-      : "A merge commit. Two timelines collided and agreed to split the blame evenly.";
+  if (/todo|wip|later|temp/.test(lower)) {
+    return `${repo} has entered the “we will absolutely return to this” chapter, a beloved classic in serialized software.`;
   }
-
-  // ── 6. Init / first commit ────────────────────────────────────────────────
-  if (/^init(?:ial)?(?:\s|$)|initial commit|first commit|^start(?:\s|$)|^bootstrap/.test(lower)) {
-    return summary.repoCount > 10
-      ? `Commit number one of what ${summary.repoCount} public repos suggest is a very ambitious ongoing series.`
-      : flavor.repoNames[0]
-        ? `Every empire starts with a single commit. ${flavor.primaryRepo} started here. The README came much, much later.`
-        : "The origin story. Whether chapter two arrived on schedule is a different kind of question.";
-  }
-
-  // ── 7. Hotfix / emergency ─────────────────────────────────────────────────
-  if (/hotfix|hot[\s-]?fix|urgent|asap|emergency|critical|broke(?:n)?(?!\w)|on\s?fire/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `"${flavor.primaryRepo} — hotfix deployed." No context, no changelog, maximum adrenaline. Classic.`
-      : "The word hotfix carries the same energy as running in flip-flops. Gets there, but at what cost.";
-  }
-
-  // ── 8. Desperation / emotion ──────────────────────────────────────────────
-  if (/please|finally|why(?:\s|$)|oh\s?no|it\s?works|worked|🙏|🤞|bruh|lol\b|wtf|omg|ugh|sigh|help/.test(lower)) {
-    const lines = [
-      `This commit message has the emotional fingerprint of a developer negotiating with their own laptop at 1 am.`,
-      `A single "finally" in a commit message contains more trauma than an entire post-mortem document.`,
-      `The excitement of "it works" followed by no explanation of what "it" is or why it stopped working previously.`,
-      `When the commit message sounds like a text to a therapist, the codebase has entered its main character era.`
-    ];
-    return lines[stableIndex(message, lines.length)];
-  }
-
-  // ── 9. TODO / WIP / temp ──────────────────────────────────────────────────
-  if (/\btodo\b|wip\b|later\b|\btemp\b|temporary|placeholder|stub\b/.test(lower)) {
-    return flavor.repoNames[1]
-      ? `${flavor.secondaryRepo} has clearly entered the "we will definitely come back to this" chapter. The chapter has no estimated publication date.`
-      : "This commit is a sticky note with Git credentials and absolutely no follow-up scheduled.";
-  }
-
-  // ── 10. Refactor ──────────────────────────────────────────────────────────
-  if (/refactor|restructur|reorgani[sz]e?|rework|rewrite|overhaul/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `A refactor commit in ${flavor.primaryRepo} with no tests mentioned. That's not cleaning up — that's redecorating the cockpit mid-flight.`
-      : `Refactoring without a test suite is just moving the bugs into a cleaner directory structure.`;
-  }
-
-  // ── 11. Style / lint / format ─────────────────────────────────────────────
-  if (/\blint\b|style\b|format(?:ting)?|prettier|eslint|whitespace|spacing|indent|trailing/.test(lower)) {
-    return `Lint and formatting fixes committed alone, unaccompanied by any logic changes. A spiritual cleanse — ${flavor.languageBlend} purified of its sins, at least syntactically.`;
-  }
-
-  // ── 12. Tests ─────────────────────────────────────────────────────────────
-  if (/\btest(?:s|ing)?\b|spec\b|coverage|jest|vitest|unit\s?test|e2e|cypress/.test(lower)) {
-    return summary.todoDensity > 20
-      ? `Tests added! ${flavor.primaryRepo} is growing up. The TODO count suggests the tests are currently outnumbered, but it's a start.`
-      : flavor.repoNames[0]
-        ? `Actual tests in ${flavor.primaryRepo}. Not a TODO comment about writing tests someday. Actual tests. Respect.`
-        : "Tests committed. The test coverage metric is now a real number instead of a philosophical concept.";
-  }
-
-  // ── 13. Version bump / release ────────────────────────────────────────────
-  if (/^v\d|bump\s+version|version\s+bump|release\s+\d|\bchore[:\s].*version|^chore.*bump/.test(lower)) {
-    return `Version bumped. The number went up. The CHANGELOG did not follow. ${summary.shippingScore < 60 ? "Par for the course." : "At least it shipped."}`;
-  }
-
-  // ── 14. Config / env / settings ───────────────────────────────────────────
-  if (/config(?:ure)?|\.env\b|settings|dotenv|\.ya?ml|\.json\b|environment\b|env\s+var/.test(lower)) {
-    return `A config commit. The diff nobody reads and everyone inherits. The ${flavor.languageBlend} stack now has one more undocumented environment variable and nobody knows what it does.`;
-  }
-
-  // ── 15. Add / new feature ─────────────────────────────────────────────────
-  if (/^add(?:ed|s)?[\s:]|^feat(?:ure)?[\s(:]|^new[\s:]|^implement(?:ed)?/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `New feature landed in ${flavor.primaryRepo}. Whether it survived the next three commits is a separate archaeological question.`
-      : "A feature commit. Brimming with optimism, unburdened by a matching test file.";
-  }
-
-  // ── 16. Remove / delete / clean ───────────────────────────────────────────
-  if (/^remov(?:e|ed|ing)|^delet(?:e|ed|ing)|^drop[\s:]|^strip[\s:]|dead\s?code|unused/.test(lower)) {
-    return flavor.repoNames[0]
-      ? `Something was removed from ${flavor.primaryRepo}. The codebase is slightly lighter now — emotionally and technically.`
-      : "Deleting code is the only programming activity that makes a codebase unconditionally better. This is brave.";
-  }
-
-  // ── 17. Fix (general) ─────────────────────────────────────────────────────
-  if (/\bfix(?:e[sd]|ing)?\b|bugfix|patch\b|resolve[sd]?\b|repair/.test(lower)) {
-    return `A fix from the ${flavor.languageBlend} era, where the repo was still winning arguments with itself. The bug is gone. The root cause is now a comment that says "not sure why this works."`;
-  }
-
-  // ── 18. Vague single-word or ≤10 chars ───────────────────────────────────
-  if (!trimmed.includes(" ") && trimmed.length <= 10) {
-    return flavor.repoNames[0]
-      ? `One word. No context. "${trimmed}" is keeping ${flavor.primaryRepo}'s secrets safer than any private repo ever could.`
-      : "One word. No context. The git log equivalent of leaving a sticky note that just says 'you know.'";
-  }
-
-  // ── 19. Update spam (catches typos like "upfate" too) ─────────────────────
-  if (/^updat[ei]|^upfat[ei]|^updte|^update[sd]?[\s:]/.test(lower)) {
-    const lines = [
-      `"Update" — the commit message that technically says everything and specifically says nothing. ${flavor.primaryRepo} deserved better.`,
-      `Twelve words in the message and the only meaningful one is "update". The diff was the only witness.`,
-      `Update commits are the git equivalent of replying "noted" to an email. Acknowledged. Unexplained. Moving on.`,
-      `The commit starts with "update" which is the developer's way of saying "I changed stuff and I'm at peace with the ambiguity."`
-    ];
-    return lines[stableIndex(message, lines.length)];
-  }
-
-  // ── 20. Short message ─────────────────────────────────────────────────────
   if (message.length <= 12) {
-    return flavor.repoNames[0]
-      ? `Short enough to fit on a screenshot, vague enough to keep ${flavor.primaryRepo} legally mysterious.`
-      : "Minimal text, maximal unreadable energy.";
+    return `${repo} got a subject short enough for a badge and vague enough for a detective novel.`;
   }
-
-  // ── Catch-all: rotating pool of 4 distinct witty lines ────────────────────
-  const catchAll = [
-    flavor.repoNames[0]
-      ? `This commit arrived in ${flavor.primaryRepo} without a roadmap, a rationale, or a reviewer. Just vibes and a timestamp.`
-      : `A commit that exists. That's the whole story. The diff has more personality than the message.`,
-    summary.inactiveRepos > 0
-      ? `Filed quietly between ${summary.inactiveRepos} other repos that also have unfinished business. ${flavor.primaryRepo} is in good company.`
-      : `The commit message raises more questions than the diff answers. ${flavor.languageBlend} continues.`,
-    flavor.repoNames[1]
-      ? `Somewhere between ${flavor.primaryRepo} and ${flavor.secondaryRepo}, a commit happened. This is that commit.`
-      : `A commit that feels native to the repo's personality — which is somehow the most unsettling part.`,
-    summary.repoCount > 5
-      ? `Across ${summary.repoCount} public repos, this commit stands out for being impossible to categorise, which is its own kind of achievement.`
-      : `The commit message is keeping its intentions private. The ${flavor.languageBlend} stack nods knowingly.`
-  ];
-  return catchAll[stableIndex(message, catchAll.length)];
+  return choose(summary, `commit-default:${message}`, [
+    `${repo} got a useful clue here; one extra phrase explaining why would turn it into actual evidence.`,
+    `A respectable subject for ${repo}, though the diff is still doing most of the narrative heavy lifting.`,
+    `${repo} can work with this. Future maintainers may still request subtitles.`
+  ] as const);
 }
-

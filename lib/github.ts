@@ -1,13 +1,14 @@
+import "server-only";
+
 import type {
-  CommitSignal,
   ContributionDay,
   GitHubProfile,
   GitHubRepo,
-  GitHubSnapshot,
-  RepoReadmeSignal
+  GitHubSnapshot
 } from "@/lib/types";
 
 const GITHUB_API = "https://api.github.com";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 function headers(includeAuth = true) {
   return {
@@ -19,42 +20,32 @@ function headers(includeAuth = true) {
 }
 
 async function githubFetch<T>(path: string, revalidate = 1800): Promise<T> {
-  // Abort if the upstream takes longer than 8 seconds — prevents the entire
-  // API route from hanging indefinitely on a slow or unresponsive GitHub endpoint.
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  let response = await fetch(`${GITHUB_API}${path}`, {
+    headers: headers(true),
+    next: { revalidate },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  });
 
-  try {
-    let response = await fetch(`${GITHUB_API}${path}`, {
-      headers: headers(true),
-      signal: controller.signal,
-      next: { revalidate }
+  if ((response.status === 403 || response.status === 429) && process.env.GITHUB_TOKEN) {
+    response = await fetch(`${GITHUB_API}${path}`, {
+      headers: headers(false),
+      next: { revalidate },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     });
-
-    // On 403, retry immediately without auth rather than waiting for a second full timeout.
-    if (response.status === 403 && process.env.GITHUB_TOKEN) {
-      response = await fetch(`${GITHUB_API}${path}`, {
-        headers: headers(false),
-        signal: controller.signal,
-        next: { revalidate }
-      });
-    }
-
-    if (response.status === 404) {
-      throw new Error("GitHub profile not found.");
-    }
-
-    if (!response.ok) {
-      throw new Error(`GitHub API failed with ${response.status}.`);
-    }
-
-    return response.json() as Promise<T>;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  if (response.status === 404) {
+    throw new Error("GitHub profile not found.");
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitHub API failed with ${response.status}.`);
+  }
+
+  return response.json() as Promise<T>;
 }
 
-function safeUsername(username: string) {
+export function normalizeGitHubUsername(username: string) {
   const cleaned = username.trim().replace(/^@/, "");
   if (!/^[a-zA-Z0-9-]{1,39}$/.test(cleaned)) {
     throw new Error("Enter a valid GitHub username.");
@@ -73,6 +64,26 @@ function decodeHtml(value: string) {
     .trim();
 }
 
+function highResolutionAvatarUrl(value: string | undefined, username: string) {
+  const fallback = `https://github.com/${username}.png?size=600`;
+  if (!value) return fallback;
+
+  try {
+    const url = new URL(decodeHtml(value));
+    if (url.hostname === "avatars.githubusercontent.com") {
+      url.searchParams.set("s", "600");
+      return url.toString();
+    }
+    if (url.hostname === "github.com" && url.pathname.endsWith(".png")) {
+      url.searchParams.set("size", "600");
+      return url.toString();
+    }
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function parseCount(value: string | undefined) {
   if (!value) return 0;
   const clean = value.replace(/,/g, "").trim().toLowerCase();
@@ -87,21 +98,16 @@ function textBetween(html: string, pattern: RegExp) {
 }
 
 async function fetchContributionDays(username: string): Promise<ContributionDay[]> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
   let response: Response;
   try {
     response = await fetch(`https://github.com/users/${username}/contributions`, {
       headers: { "User-Agent": "GitRoast" },
-      signal: controller.signal,
-      next: { revalidate: 900 }
+      next: { revalidate: 900 },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     });
   } catch {
-    clearTimeout(timeoutId);
     return [];
   }
-  clearTimeout(timeoutId);
 
   if (!response.ok) {
     return [];
@@ -132,24 +138,16 @@ async function fetchContributionDays(username: string): Promise<ContributionDay[
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function fetchWebSnapshot(username: string): Promise<GitHubSnapshot> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-  let response: Response;
-  try {
-    response = await fetch(`https://github.com/${username}?tab=repositories`, {
-      headers: { "User-Agent": "GitRoast" },
-      signal: controller.signal,
-      next: { revalidate: 900 }
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err instanceof Error && err.name === "AbortError"
-      ? new Error("GitHub profile page timed out.")
-      : err;
-  }
-  clearTimeout(timeoutId);
+async function fetchWebSnapshot(
+  username: string,
+  contributionsPromise = fetchContributionDays(username),
+  commitsPromise = fetchPublicCommitSignals(username)
+): Promise<GitHubSnapshot> {
+  const response = await fetch(`https://github.com/${username}?tab=repositories`, {
+    headers: { "User-Agent": "GitRoast" },
+    next: { revalidate: 900 },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  });
 
   if (response.status === 404) {
     throw new Error("GitHub profile not found.");
@@ -199,7 +197,7 @@ async function fetchWebSnapshot(username: string): Promise<GitHubSnapshot> {
     profile: {
       login: username,
       name: displayName,
-      avatar_url: decodeHtml(avatarUrl),
+      avatar_url: highResolutionAvatarUrl(avatarUrl, username),
       html_url: `https://github.com/${username}`,
       public_repos: repoCount || repos.length,
       followers: followerCount,
@@ -209,50 +207,56 @@ async function fetchWebSnapshot(username: string): Promise<GitHubSnapshot> {
       bio
     },
     repos,
-    commits: [],
-    readmes: repos.map((repo) => ({ repo: repo.name, hasReadme: Boolean(repo.description) })),
-    contributions: await fetchContributionDays(username)
+    commits: await commitsPromise,
+    contributions: await contributionsPromise,
+    source: "public-profile"
   };
 }
 
-async function fetchCommits(username: string, repos: GitHubRepo[]): Promise<CommitSignal[]> {
-  const candidates = repos
-    .filter((repo) => !repo.fork)
-    .sort((a, b) => new Date(b.pushed_at ?? b.updated_at).getTime() - new Date(a.pushed_at ?? a.updated_at).getTime())
-    .slice(0, 8);
+async function fetchPublicCommitSignals(username: string) {
+  try {
+    const response = await fetch(`https://github.com/${username}.atom`, {
+      headers: { Accept: "application/atom+xml", "User-Agent": "GitRoast" },
+      next: { revalidate: 900 },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
 
-  const batches = await Promise.allSettled(
-    candidates.map(async (repo) => {
-      const commits = await githubFetch<Array<{ commit: { message: string; author: { date: string } } }>>(
-        `/repos/${repo.full_name}/commits?per_page=8`,
-        900
-      );
-      return commits.map((commit) => ({
-        repo: repo.name,
-        message: commit.commit.message.split("\n")[0].trim(),
-        date: commit.commit.author.date
-      }));
-    })
-  );
+    if (!response.ok) return [];
+    const xml = await response.text();
+    const seen = new Set<string>();
+    const commits = Array.from(xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)).flatMap((match) => {
+      const entry = match[1];
+      const title = textBetween(entry, /<title[^>]*>([\s\S]*?)<\/title>/) ?? "";
+      const pushMatch = title.match(/\bpushed\s+(.+)$/i);
+      if (!pushMatch) return [];
 
-  return batches
-    .flatMap((batch) => (batch.status === "fulfilled" ? batch.value : []))
-    .filter((commit) => commit.message)
-    .slice(0, 50);
-}
+      const content = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1];
+      if (!content) return [];
+      const decodedContent = decodeHtml(content);
+      const date = textBetween(entry, /<published>([\s\S]*?)<\/published>/) ?? new Date().toISOString();
+      const repo = decodeHtml(pushMatch[1]).split("/").at(-1) ?? decodeHtml(pushMatch[1]);
 
-// Synchronous heuristic: repos with a description almost always have a README.
-// This replaces 16 individual /readme API calls (each ~200-400ms) with a zero-cost
-// local check. README coverage is a roasting metric — it does not need to be exact.
-function deriveReadmes(repos: GitHubRepo[]): RepoReadmeSignal[] {
-  return repos
-    .filter((repo) => !repo.fork)
-    .slice(0, 16)
-    .map((repo) => ({ repo: repo.name, hasReadme: Boolean(repo.description) }));
+      return Array.from(decodedContent.matchAll(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/g))
+        .map((messageMatch) => decodeHtml(messageMatch[1].replace(/<[^>]*>/g, "")).split("\n")[0].trim())
+        .filter((message) => {
+          const key = `${repo}\0${message}`;
+          if (!message || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((message) => ({ repo, message, date }));
+    });
+
+    return commits.slice(0, 50);
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchGitHubSnapshot(rawUsername: string): Promise<GitHubSnapshot> {
-  const username = safeUsername(rawUsername);
+  const username = normalizeGitHubUsername(rawUsername);
+  const contributionsPromise = fetchContributionDays(username);
+  const commitsPromise = fetchPublicCommitSignals(username);
   let profile: GitHubProfile;
   let repos: GitHubRepo[];
 
@@ -262,25 +266,19 @@ export async function fetchGitHubSnapshot(rawUsername: string): Promise<GitHubSn
       githubFetch<GitHubRepo[]>(`/users/${username}/repos?per_page=100&sort=updated`)
     ]);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("403")) {
-      return fetchWebSnapshot(username);
+    if (error instanceof Error && /\b(?:403|429)\b/.test(error.message)) {
+      return fetchWebSnapshot(username, contributionsPromise, commitsPromise);
     }
     throw error;
   }
 
-  // deriveReadmes is synchronous — compute it immediately and run the two remaining
-  // async calls in parallel. This removes 16 serial network round-trips.
-  const readmes = deriveReadmes(repos);
-  const [commits, contributions] = await Promise.all([
-    fetchCommits(username, repos),
-    fetchContributionDays(username)
-  ]);
+  const [commits, contributions] = await Promise.all([commitsPromise, contributionsPromise]);
 
   return {
-    profile,
+    profile: { ...profile, avatar_url: highResolutionAvatarUrl(profile.avatar_url, username) },
     repos,
     commits,
-    readmes,
-    contributions
+    contributions,
+    source: "github-api"
   };
 }
