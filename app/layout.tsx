@@ -1,16 +1,26 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+function resolveHttpUrl(value: string | undefined, assumeHttps = false) {
+  const candidate = value?.trim();
+  if (!candidate || candidate === "-") return null;
+
+  try {
+    const url = new URL(assumeHttps && !candidate.includes("://") ? `https://${candidate}` : candidate);
+    return (url.protocol === "http:" || url.protocol === "https:") && url.hostname ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+const metadataBase =
+  resolveHttpUrl(process.env.NEXT_PUBLIC_SITE_URL) ??
+  resolveHttpUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL, true) ??
+  resolveHttpUrl(process.env.VERCEL_URL, true) ??
+  new URL("http://localhost:3000");
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase,
   title: {
     default: "GitRoast - GitHub profile review",
     template: "%s - GitRoast"
