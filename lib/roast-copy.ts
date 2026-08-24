@@ -1,6 +1,15 @@
-import type { RoastReceipt, RoastSummary } from "@/lib/types";
+import type { RepositoryRoast, RoastReceipt, RoastSummary } from "@/lib/types";
 
-type RepoFlavorSummary = Pick<RoastSummary, "languages" | "repos">;
+type RepoFlavorSummary = {
+  languages: string[];
+  repos: Array<{
+    name: string;
+    description: string | null;
+    language: string | null;
+    stars: number;
+    pushedAt: string | null;
+  }>;
+};
 
 function titleCase(input: string) {
   return input
@@ -223,6 +232,101 @@ export function repoAwareRedemption(summary: RoastSummary) {
     ? `give the next commit subject one clear “what” and one useful “why”`
     : "surface one recent change with a descriptive commit subject";
   return `Start with ${flavor.primaryRepo}: add a crisp status note, label or archive one quiet side quest, and ${commitAdvice}. Same personality, much easier archaeology.`;
+}
+
+function isQuietRepo(pushedAt: string | null) {
+  if (!pushedAt) return true;
+  const pushedTime = new Date(pushedAt).getTime();
+  return !Number.isFinite(pushedTime) || Date.now() - pushedTime > 365 * 24 * 60 * 60 * 1000;
+}
+
+function repositoryReviewStatus(repo: RoastSummary["repos"][number]): RepositoryRoast["status"] {
+  if (repo.archived) return "approved";
+  if (!repo.description?.trim() || isQuietRepo(repo.pushedAt)) return "changes-requested";
+  if (repo.stars >= 100 || repo.forks >= 10) return "approved";
+  return "commented";
+}
+
+function repoCommentary(summary: RoastSummary, repo: RoastSummary["repos"][number]) {
+  const salt = `repository-roast:${repo.name}`;
+
+  if (repo.archived) {
+    return choose(summary, `${salt}:archived`, [
+      `${repo.name} is archived with dignity: one side quest that found an ending and remembered to close the tab.`,
+      `${repo.name} completed its character arc and earned the Archive badge instead of pretending the roadmap is still loading.`,
+      `${repo.name} is a finished exhibit, not an abandoned crime scene. The roast approves this unusually honest lifecycle state.`
+    ] as const);
+  }
+
+  if (!repo.description?.trim()) {
+    return choose(summary, `${salt}:description`, [
+      `${repo.name} shipped without a description, so visitors receive a repo name and the confidence to invent the rest.`,
+      `${repo.name} left its one-line pitch blank. The README is now doing witness protection for the premise.`,
+      `${repo.name} has Public visibility and Private context, an ambitious new GitHub access model.`
+    ] as const);
+  }
+
+  if (isQuietRepo(repo.pushedAt)) {
+    return choose(summary, `${salt}:quiet`, [
+      `${repo.name} has been quiet long enough that the latest push qualifies as repository archaeology.`,
+      `${repo.name} still has a description, a language, and the unmistakable calm of a branch on sabbatical.`,
+      `${repo.name} is not abandoned; it is preserving a historically accurate snapshot of the last productive weekend.`
+    ] as const);
+  }
+
+  if (repo.stars >= 100) {
+    return choose(summary, `${salt}:stars`, [
+      `${repo.name} collected ${repo.stars.toLocaleString("en-US")} stars, so the internet has already reviewed this diff and clicked Approve.`,
+      `${repo.name} has ${repo.stars.toLocaleString("en-US")} stars. The roast opened a review and immediately discovered it was outnumbered.`,
+      `${repo.name} turned ${repo.language ?? "code"} into ${repo.stars.toLocaleString("en-US")} public approvals. Suspiciously competent; leaving one nit for tradition.`
+    ] as const);
+  }
+
+  if (repo.openIssues >= 10) {
+    return choose(summary, `${salt}:issues`, [
+      `${repo.name} has ${repo.openIssues.toLocaleString("en-US")} open issues, which is less a queue and more a community-authored sequel plan.`,
+      `${repo.name} is actively maintained and ${repo.openIssues.toLocaleString("en-US")} issue tabs would like a quick word with the sprint board.`,
+      `${repo.name} keeps ${repo.openIssues.toLocaleString("en-US")} open conversations in flight. The issue tracker has become its own social network.`
+    ] as const);
+  }
+
+  if (repo.forks > 0) {
+    return choose(summary, `${salt}:forks`, [
+      `${repo.name} inspired ${repo.forks.toLocaleString("en-US")} forks, proving at least a few developers preferred making a branch to filing a complaint.`,
+      `${repo.name} has ${repo.forks.toLocaleString("en-US")} forks and a recent pulse; the side quest has accidentally acquired contributors.`,
+      `${repo.name} escaped into ${repo.forks.toLocaleString("en-US")} forks. That is either adoption or a very distributed code review.`
+    ] as const);
+  }
+
+  if (repo.defaultBranch === "master") {
+    return choose(summary, `${salt}:default-branch`, [
+      `${repo.name} keeps master on the default-branch sign. The code may be current; the lobby decor is period-correct.`,
+      `${repo.name} still enters through master, a vintage branch label maintained with museum-grade consistency.`,
+      `${repo.name} uses master as its default branch. No charge filed; the signage simply arrived from an earlier GitHub season.`
+    ] as const);
+  }
+
+  if (!repo.topics.length) {
+    return choose(summary, `${salt}:topics`, [
+      `${repo.name} is active and described, but its topics have invoked metadata protection. Discovery is now a click-first experience.`,
+      `${repo.name} passed the maintenance check and skipped the topic labels, leaving search to appreciate the mystery.`,
+      `${repo.name} has context and recent work; only the topic shelf is empty enough to qualify as minimalist design.`
+    ] as const);
+  }
+
+  return choose(summary, `${salt}:active`, [
+    `${repo.name} is a recently active ${repo.language ?? "code"} repo with enough context to pass review. The roast reluctantly approves this file.`,
+    `${repo.name} has a purpose, a recent push, and no obvious crime scene. Leaving a comment so the review still looks billable.`,
+    `${repo.name} is quietly shipping in ${repo.language ?? "its chosen stack"}. No spectacle, just the deeply inconvenient presence of maintainable evidence.`
+  ] as const);
+}
+
+export function repoAwareRepositoryRoasts(summary: RoastSummary): RepositoryRoast[] {
+  return summary.repos.slice(0, 6).map((repo) => ({
+    name: repo.name,
+    commentary: repoCommentary(summary, repo),
+    status: repositoryReviewStatus(repo)
+  }));
 }
 
 export function repoAwareCommitCommentary(summary: RoastSummary, message: string) {

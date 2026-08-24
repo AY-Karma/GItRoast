@@ -13,10 +13,11 @@ import {
   Github,
   History,
   Info,
+  LoaderCircle,
   LockKeyhole,
+  MessageSquare,
   Search,
-  Star,
-  Users
+  ShieldCheck
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -25,7 +26,7 @@ import type { RoastResponse } from "@/lib/types";
 
 const RoastReport = dynamic(
   () => import("@/components/roast-report").then((module) => module.RoastReport),
-  { loading: () => <div className="mx-auto my-10 h-32 w-full max-w-[1216px] animate-pulse rounded-md border border-[#30363d] bg-[#161b22]" /> }
+  { loading: () => <div className="app-shell my-10 px-4 md:px-6"><div className="h-32 animate-pulse rounded-md border border-[#30363d] bg-[#161b22]" /></div> }
 );
 
 const examples = ["torvalds", "gaearon", "sindresorhus"];
@@ -33,7 +34,7 @@ const loadingSteps = [
   "Fetching public profile and repositories",
   "Reading the public activity timeline",
   "Reviewing contribution activity",
-  "Writing an unnecessarily honest review"
+  "Generating a grounded repository review"
 ] as const;
 
 function LoadingStage({ username }: { username: string }) {
@@ -70,10 +71,12 @@ function LoadingStage({ username }: { username: string }) {
   );
 }
 
-function RepositoryHeader() {
+function RepositoryHeader({ result, isLoading, username }: { result: RoastResponse | null; isLoading: boolean; username: string }) {
+  const approvedCount = result?.report.repositoryRoasts.filter((repo) => repo.status === "approved").length ?? 0;
+
   return (
     <div className="border-b border-[#21262d] bg-[#0d1117]">
-      <div className="mx-auto w-full max-w-[1280px] px-4 pt-5 md:px-8">
+      <div className="app-shell px-4 pt-5 md:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2 text-xl">
             <BookOpen className="size-4 shrink-0 text-[#8b949e]" />
@@ -83,22 +86,39 @@ function RepositoryHeader() {
             <span className="rounded-full border border-[#30363d] px-2 py-0.5 text-xs font-medium text-[#8b949e]">Public</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><Users className="size-4" /> Watch <span className="rounded-full bg-[#30363d] px-1.5">1.2k</span></span>
-            <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><Star className="size-4" /> Star <span className="rounded-full bg-[#30363d] px-1.5">8.4k</span></span>
+            {result ? (
+              <>
+                <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><MessageSquare className="size-4" /> {result.report.repositoryRoasts.length} repo comments</span>
+                <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[rgba(46,160,67,.45)] bg-[rgba(46,160,67,.12)] px-3 text-xs font-medium text-[#3fb950]"><Check className="size-4" /> {approvedCount} approved</span>
+              </>
+            ) : isLoading ? (
+              <>
+                <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><LoaderCircle className="octicon-spin size-4" /> Checks running</span>
+                <span className="hidden h-8 items-center gap-2 rounded-md border border-[#30363d] px-3 text-xs text-[#8b949e] sm:inline-flex"><Search className="size-4" /> @{username}</span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-8 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 text-xs font-medium text-[#c9d1d9]"><ShieldCheck className="size-4 text-[#3fb950]" /> Artifact-only jokes</span>
+                <span className="hidden h-8 items-center gap-2 rounded-md border border-[#30363d] px-3 text-xs text-[#8b949e] sm:inline-flex"><LockKeyhole className="size-4" /> Public data</span>
+              </>
+            )}
           </div>
         </div>
         <nav className="mt-5 flex gap-1 overflow-x-auto" aria-label="Repository navigation">
           {[
-            [Code2, "Overview", true],
-            [Flame, "Roast report", false],
-            [Activity, "Activity", false],
-            [History, "History", false]
-          ].map(([Icon, label, active]) => {
+            [Code2, "Overview", "#main-content", true],
+            ...(result ? [
+              [Flame, "Roast report", "#verdict", false],
+              [Activity, "Receipts", "#receipts", false],
+              [History, "Commits", "#commits", false],
+              [MessageSquare, "Repositories", "#repositories", false]
+            ] : [])
+          ].map(([Icon, label, href, active]) => {
             const NavIcon = Icon as typeof Code2;
             return (
               <a
                 key={String(label)}
-                href={active ? "#main-content" : "#report"}
+                href={String(href)}
                 className={`flex h-10 shrink-0 items-center gap-2 border-b-2 px-3 text-sm text-[#c9d1d9] hover:bg-[#161b22] ${active ? "border-[#f78166] font-semibold" : "border-transparent"}`}
               >
                 <NavIcon className="size-4 text-[#8b949e]" /> {String(label)}
@@ -111,11 +131,12 @@ function RepositoryHeader() {
   );
 }
 
-function FileList() {
+function FileList({ isLoading, hasResult }: { isLoading: boolean; hasResult: boolean }) {
+  const state = hasResult ? "complete" : isLoading ? "running" : "waiting";
   const rows = [
-    ["profile.json", "Public profile and repository metadata", "just now"],
-    ["activity.log", "Recent public timeline commits", "just now"],
-    ["roast.md", "Generate the review nobody requested", "pending"]
+    ["profile.json", "Public profile and repository metadata", state],
+    ["activity.log", "Recent public timeline and contribution signals", state],
+    ["ROAST.md", hasResult ? "Repository review comments generated" : isLoading ? "Generating grounded review comments" : "Waiting for a GitHub username", state]
   ];
 
   return (
@@ -125,11 +146,14 @@ function FileList() {
         <span className="text-[#8b949e]">3 files</span>
       </div>
       <div className="divide-y divide-[#21262d]">
-        {rows.map(([name, message, time]) => (
-          <div key={name} className="grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(150px,.8fr)_1.3fr_auto] sm:items-center">
+        {rows.map(([name, message, status], index) => (
+          <div key={name} className="file-state-row grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(150px,.8fr)_1.3fr_auto] sm:items-center" style={{ animationDelay: `${index * 35}ms` }}>
             <span className="flex items-center gap-2 font-medium text-[#58a6ff]"><FileCode2 className="size-4 text-[#8b949e]" /> {name}</span>
             <span className="truncate text-[#8b949e]">{message}</span>
-            <span className="text-xs text-[#8b949e]">{time}</span>
+            <span className={`flex items-center gap-1.5 text-xs ${status === "complete" ? "text-[#3fb950]" : status === "running" ? "text-[#d29922]" : "text-[#8b949e]"}`}>
+              {status === "complete" ? <Check className="file-status-resolve size-3.5" /> : status === "running" ? <LoaderCircle className="octicon-spin size-3.5" /> : <CircleDot className="size-3.5" />}
+              {status === "complete" ? "reviewed" : status === "running" ? "running" : "waiting"}
+            </span>
           </div>
         ))}
       </div>
@@ -160,6 +184,7 @@ export function RoastExperience() {
     const requestId = ++requestIdRef.current;
     setUsername(clean);
     setActiveUsername(clean);
+    setResult(null);
     setIsLoading(true);
     setError("");
     void import("@/components/roast-report");
@@ -224,7 +249,7 @@ export function RoastExperience() {
   return (
     <main id="main-content" className="min-h-screen bg-[#0d1117] text-[#f0f6fc]">
       <header className="border-b border-[#21262d] bg-[#010409]">
-        <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center gap-3 px-4 md:px-8">
+        <div className="app-shell flex h-16 items-center gap-3 px-4 md:px-8">
           <a href="#main-content" aria-label="GitRoast home" className="text-[#f0f6fc]"><Github className="size-8" fill="currentColor" /></a>
           <div className="h-6 w-px bg-[#30363d]" />
           <span className="font-semibold text-[#f0f6fc]">GitRoast</span>
@@ -233,11 +258,11 @@ export function RoastExperience() {
         </div>
       </header>
 
-      <RepositoryHeader />
+      <RepositoryHeader result={result} isLoading={isLoading} username={activeUsername} />
 
-      <div className="mx-auto grid w-full max-w-[1216px] gap-8 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="app-shell grid gap-8 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_296px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
-          <FileList />
+          <FileList isLoading={isLoading} hasResult={Boolean(result)} />
 
           <section className="github-box overflow-hidden" aria-labelledby="readme-title">
             <div className="github-box-header flex items-center gap-2 px-4 py-3 text-xs font-semibold">
@@ -245,11 +270,11 @@ export function RoastExperience() {
             </div>
             <div className="markdown-body p-5 sm:p-8">
               <h1 id="readme-title">Roast your GitHub profile</h1>
-              <p className="max-w-2xl text-base text-[#c9d1d9]">
+              <p className="max-w-2xl text-base text-[#c9d1d9] xl:max-w-4xl 2xl:max-w-5xl">
                 Enter a public username. GitRoast reviews repository activity, recent public commits, project descriptions, and contribution habits—then writes the code review your teammates were too polite to leave.
               </p>
 
-              <form id="roast-form" onSubmit={onSubmit} className="mt-6 max-w-2xl" aria-describedby="form-note form-error">
+              <form id="roast-form" onSubmit={onSubmit} className="mt-6 max-w-2xl xl:max-w-4xl 2xl:max-w-5xl" aria-describedby="form-note form-error">
                 <label htmlFor="username" className="mb-2 block font-semibold">GitHub username</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex min-h-10 flex-1 items-center rounded-md border border-[#30363d] bg-[#010409] px-3 shadow-inner focus-within:border-[#58a6ff] focus-within:ring-1 focus-within:ring-[#58a6ff]">
@@ -303,7 +328,7 @@ export function RoastExperience() {
         <aside className="space-y-6 text-sm" aria-label="About GitRoast">
           <section>
             <h2 className="mb-3 font-semibold text-[#f0f6fc]">About</h2>
-            <p className="leading-6 text-[#c9d1d9]">A public GitHub profile reviewer with a slightly hostile sense of humor.</p>
+            <p className="leading-6 text-[#c9d1d9]">A public GitHub profile reviewer with a playful code-review sense of humor.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {["github", "developer-tools", "roast", "open-source"].map((topic) => <span key={topic} className="rounded-full bg-[rgba(56,139,253,.15)] px-2.5 py-1 text-xs font-medium text-[#58a6ff]">{topic}</span>)}
             </div>
@@ -328,7 +353,11 @@ export function RoastExperience() {
             </div>
           </div>
           <div className="border-t border-[#21262d] pt-4 text-xs text-[#8b949e]">
-            <a href="#methodology" className="flex items-center justify-between hover:underline">Methodology <ChevronRight className="size-4" /></a>
+            {result ? (
+              <a href="#methodology" className="flex min-h-7 items-center justify-between hover:underline">Methodology <ChevronRight className="size-4" /></a>
+            ) : (
+              <span className="flex min-h-7 items-center justify-between">Methodology appears with the report <Info className="size-4" /></span>
+            )}
           </div>
         </aside>
       </div>
@@ -336,7 +365,7 @@ export function RoastExperience() {
       {result ? <RoastReport result={result} headingRef={reportHeadingRef} onReset={reset} /> : null}
 
       <footer className="mt-10 border-t border-[#21262d]">
-        <div className="mx-auto flex w-full max-w-[1216px] flex-col gap-3 px-4 py-8 text-xs text-[#8b949e] sm:flex-row sm:items-center sm:justify-between md:px-6">
+        <div className="app-shell flex flex-col gap-3 px-4 py-8 text-xs text-[#8b949e] sm:flex-row sm:items-center sm:justify-between md:px-6">
           <span className="flex items-center gap-2"><Github className="size-5" /> GitRoast is not affiliated with GitHub.</span>
           <span>Roasts code and public work—not people.</span>
         </div>

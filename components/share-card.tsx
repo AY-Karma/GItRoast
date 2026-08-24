@@ -1,18 +1,67 @@
 "use client";
 
-import { Check, Download, GitBranch, Github, Link2, LoaderCircle, Share2 } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Code2,
+  Copy,
+  Download,
+  GitBranch,
+  GitCommitHorizontal,
+  Github,
+  Link2,
+  LoaderCircle,
+  MessageSquare,
+  Share2,
+  Star
+} from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { RoastResponse } from "@/lib/types";
+import { compactNumber, profileScoreColor } from "@/lib/utils";
 
-type Feedback = "idle" | "downloading" | "downloaded" | "copied" | "shared" | "error";
+type Feedback = "idle" | "downloading" | "downloaded" | "copied" | "caption-copied" | "shared" | "error";
+
+const activityPalette = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 export function ShareCard({ result }: { result: RoastResponse }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [feedback, setFeedback] = useState<Feedback>("idle");
+  const scoreColor = profileScoreColor(result.report.roastScore);
   const bestSignal = result.report.receipts.find((receipt) => receipt.title === "Commit message exhibit")?.punchline
     ?? result.report.roast;
+  const featuredReview = result.report.repositoryRoasts[0];
+  const featuredRepository = result.summary.repos.find((repo) => repo.name === featuredReview?.name) ?? result.summary.repos[0];
+  const reviewSubject = featuredReview?.name ?? featuredRepository?.name ?? "profile-review";
+  const reviewCommentary = featuredReview?.commentary ?? bestSignal;
+  const reviewStatus = featuredReview?.status ?? "commented";
+  const reviewStatusLabel = {
+    approved: "Approved",
+    commented: "Commented",
+    "changes-requested": "Changes requested"
+  }[reviewStatus];
+  const reviewStatusClass = reviewStatus === "approved"
+    ? "border-[#238636] bg-[#122117] text-[#3fb950]"
+    : reviewStatus === "changes-requested"
+      ? "border-[#9e6a03] bg-[#2a1f0b] text-[#d29922]"
+      : "border-[#1f6feb] bg-[#0c2d6b] text-[#79c0ff]";
+  const scoreVerdict = result.report.roastScore >= 80
+    ? "Merge ready"
+    : result.report.roastScore >= 60
+      ? "Review complete"
+      : "Changes requested";
+  const shareStats = [
+    { label: "Contributions", value: compactNumber(result.summary.totalContributions), Icon: GitCommitHorizontal },
+    { label: "Stars earned", value: compactNumber(result.summary.totalStars), Icon: Star },
+    { label: "Public repos", value: compactNumber(result.summary.repoCount), Icon: BookOpen },
+    { label: "Top language", value: result.summary.languages[0] ?? "Mixed", Icon: Code2 }
+  ];
+  const recentActivity = result.summary.contributions.slice(-14);
+  const activityLevels = Array.from({ length: 14 }, (_, index) => {
+    const offset = 14 - recentActivity.length;
+    return index < offset ? 0 : recentActivity[index - offset]?.level ?? 0;
+  });
 
   async function copyText(value: string) {
     if (navigator.clipboard?.writeText) {
@@ -43,11 +92,28 @@ export function ShareCard({ result }: { result: RoastResponse }) {
 
   async function download() {
     if (!cardRef.current || feedback === "downloading") return;
+    const card = cardRef.current;
+    let exportCard: HTMLDivElement | null = null;
     setFeedback("downloading");
     try {
+      exportCard = card.cloneNode(true) as HTMLDivElement;
+      exportCard.dataset.exporting = "true";
+      Object.assign(exportCard.style, {
+        position: "fixed",
+        inset: "0 auto auto -10000px",
+        width: "1200px",
+        height: "630px",
+        minHeight: "630px",
+        maxWidth: "none",
+        aspectRatio: "auto",
+        pointerEvents: "none"
+      });
+      document.body.appendChild(exportCard);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(cardRef.current, {
-        cacheBust: true,
+      const dataUrl = await toPng(exportCard, {
+        cacheBust: false,
+        skipFonts: true,
         pixelRatio: 1,
         width: 1200,
         height: 630,
@@ -62,6 +128,8 @@ export function ShareCard({ result }: { result: RoastResponse }) {
       settle("downloaded");
     } catch {
       settle("error");
+    } finally {
+      exportCard?.remove();
     }
   }
 
@@ -70,8 +138,14 @@ export function ShareCard({ result }: { result: RoastResponse }) {
     settle((await copyText(url)) ? "copied" : "error");
   }
 
+  async function copyCaption() {
+    const url = `${window.location.origin}?u=${encodeURIComponent(result.summary.username)}`;
+    const text = `@${result.summary.username} was reviewed as “${result.report.developerType}” — ${result.report.roastScore}/100.\n${reviewCommentary}\n${url}`;
+    settle((await copyText(text)) ? "caption-copied" : "error");
+  }
+
   async function share() {
-    const text = `@${result.summary.username} scored ${result.report.roastScore}/100 on GitRoast: ${result.report.developerType}`;
+    const text = `@${result.summary.username} was reviewed as “${result.report.developerType}” — ${result.report.roastScore}/100. ${reviewCommentary}`;
     const url = `${window.location.origin}?u=${encodeURIComponent(result.summary.username)}`;
     if (navigator.share) {
       try {
@@ -90,27 +164,32 @@ export function ShareCard({ result }: { result: RoastResponse }) {
     downloading: "Rendering preview...",
     downloaded: "PNG downloaded",
     copied: "Copied to clipboard",
+    "caption-copied": "Roast caption copied",
     shared: "Share sheet opened",
     error: "Share failed. Please try again."
   }[feedback];
 
   return (
-    <section className="mx-auto grid w-full max-w-[1216px] gap-6 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="github-box overflow-hidden bg-[#010409] p-3">
+    <section id="share" className="app-shell grid scroll-mt-16 gap-6 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1120px)_360px] 2xl:justify-center">
+      <div className="github-box share-card-preview w-full max-w-[1120px] justify-self-center overflow-hidden bg-[#010409] p-3">
         <div
           ref={cardRef}
-          className="relative flex aspect-[1200/630] min-h-[360px] w-full flex-col overflow-hidden rounded-md border border-[#30363d] bg-[#0d1117] text-[#f0f6fc]"
+          data-share-card
+          className="relative grid aspect-[1200/630] min-h-[360px] w-full grid-rows-[clamp(3.25rem,14%,5.5rem)_minmax(0,1fr)_clamp(3rem,11%,4.5rem)] overflow-hidden rounded-md border border-[#30363d] bg-[#0d1117] text-[#f0f6fc] [container-type:inline-size]"
         >
-          <div className="flex h-[15%] min-h-16 items-center justify-between border-b border-[#21262d] bg-[#010409] px-[5%]">
-            <div className="flex items-center gap-3 text-xl font-semibold">
-              <Github className="size-8" />
-              <span>gitroast / profile-review</span>
-              <span className="rounded-full border border-[#30363d] px-2 py-0.5 text-xs font-medium text-[#8b949e]">Public</span>
+          <div className="flex min-w-0 items-center justify-between gap-[2cqw] border-b border-[#21262d] bg-[#010409] px-[5cqw]">
+            <div className="flex min-w-0 items-center gap-[clamp(0.4rem,1.4cqw,0.75rem)] font-semibold">
+              <Github className="size-[clamp(1.35rem,3cqw,2rem)] shrink-0" />
+              <span className="truncate text-[clamp(0.75rem,1.8cqw,1.25rem)]">gitroast / profile-review</span>
+              <span className="shrink-0 rounded-full border border-[#30363d] px-[1cqw] py-0.5 text-[clamp(0.5rem,1cqw,0.75rem)] font-medium text-[#8b949e]">Public</span>
             </div>
-            <div className="mono-type text-xs text-[#8b949e]">ROAST.md</div>
+            <div className="mono-type shrink-0 text-[clamp(0.5rem,1cqw,0.75rem)] text-[#8b949e]">ROAST.md</div>
           </div>
 
-          <div className="flex flex-1 items-center gap-[5%] px-[6%] py-[5%]">
+          <div
+            data-share-main
+            className="share-card-main grid min-h-0 min-w-0 grid-cols-[clamp(4.5rem,18cqw,13.5rem)_minmax(0,1fr)_clamp(6.5rem,18cqw,13.5rem)] items-center gap-x-[clamp(0.75rem,4cqw,3rem)] gap-y-[clamp(0.5rem,1.4cqw,1rem)] px-[6cqw] py-[2.4cqw]"
+          >
             <Image
               src={result.summary.avatarUrl}
               alt=""
@@ -118,28 +197,62 @@ export function ShareCard({ result }: { result: RoastResponse }) {
               height={240}
               quality={100}
               sizes="240px"
-              className="aspect-square h-auto w-[18%] min-w-24 shrink-0 rounded-full border border-[#30363d] object-cover sm:min-w-28"
+              className="share-card-avatar share-card-motion aspect-square h-auto w-full rounded-full border border-[#30363d] object-cover"
             />
-            <div className="min-w-0 flex-1">
-              <div className="mono-type text-sm text-[#8b949e]">github.com/{result.summary.username}</div>
-              <h2 className="mt-3 text-[clamp(2rem,5vw,4.5rem)] font-semibold leading-[1.05] tracking-[-0.035em]">{result.report.developerType}</h2>
-              <p className="mt-5 line-clamp-2 max-w-3xl text-base leading-7 text-[#c9d1d9]">{bestSignal}</p>
+            <div className="share-card-identity share-card-motion min-w-0 self-center">
+              <div className="share-card-username mono-type break-all text-[clamp(0.6rem,1.2cqw,0.875rem)] text-[#8b949e]">github.com/{result.summary.username}</div>
+              <h2
+                data-share-title
+                className="mt-[1.2cqw] max-w-full text-balance text-[clamp(1.5rem,5.4cqw,4rem)] font-semibold leading-[1.02] tracking-[-0.035em] [overflow-wrap:anywhere]"
+              >
+                {result.report.developerType}
+              </h2>
+              <p className="mt-[1.5cqw] line-clamp-2 max-w-full text-[clamp(0.7rem,1.4cqw,1rem)] leading-[1.5] text-[#c9d1d9] [overflow-wrap:anywhere]">{bestSignal}</p>
             </div>
-            <div className="w-[18%] min-w-[104px] shrink-0 rounded-md border border-[#30363d] bg-[#161b22] p-3 sm:min-w-[132px] sm:p-4">
-              <span className="mono-type block text-[10px] uppercase tracking-wider text-[#8b949e] sm:text-xs">Roast score</span>
-              <div className="mt-2 flex items-baseline gap-1">
-                <strong className="text-[clamp(2.4rem,5vw,4.8rem)] leading-none">{result.report.roastScore}</strong>
-                <span className="text-sm text-[#8b949e]">/100</span>
+            <div data-share-score className="share-card-score share-card-motion min-w-0 rounded-md border border-[#30363d] bg-[#161b22] p-[clamp(0.6rem,1.6cqw,1rem)]">
+              <span className="share-card-score-label mono-type block text-[clamp(0.5rem,0.9cqw,0.7rem)] uppercase tracking-wider text-[#8b949e]"><span className="share-card-score-label-prefix">Profile </span>score</span>
+              <div className="mt-[1.2cqw] flex min-w-0 items-end gap-[0.5cqw]">
+                <strong className="text-[clamp(2rem,6cqw,4.5rem)] leading-none">{result.report.roastScore}</strong>
+                <span className="share-card-score-unit pb-[0.5cqw] text-[clamp(0.55rem,1.2cqw,0.875rem)] text-[#8b949e]">/100</span>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#30363d]">
-                <div className="h-full rounded-full bg-[#f85149]" style={{ width: `${result.report.roastScore}%` }} />
+              <div className="mt-[1.5cqw] h-[clamp(0.3rem,0.7cqw,0.5rem)] overflow-hidden rounded-full bg-[#30363d]">
+                <div className="share-card-score-fill share-card-motion h-full rounded-full" style={{ width: `${result.report.roastScore}%`, backgroundColor: scoreColor }} />
+              </div>
+              <span className="share-card-score-verdict mt-[1cqw] block text-[clamp(0.5rem,0.9cqw,0.7rem)] font-semibold" style={{ color: scoreColor }}>{scoreVerdict}</span>
+            </div>
+
+            <div data-share-details className="share-card-details col-start-2 col-end-4 grid min-w-0 grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-[1cqw] self-end">
+              <div className="share-card-review share-card-motion min-w-0 rounded-md border border-[#30363d] bg-[#010409] px-[1.3cqw] py-[1cqw]">
+                <div className="flex min-w-0 items-center gap-[0.7cqw]">
+                  <MessageSquare className="size-[clamp(0.65rem,1.2cqw,0.9rem)] shrink-0 text-[#58a6ff]" />
+                  <span className="mono-type min-w-0 truncate text-[clamp(0.5rem,0.9cqw,0.7rem)] text-[#8b949e]">gitroast[bot] reviewed {reviewSubject}</span>
+                  <span className={`shrink-0 rounded-full border px-[0.7cqw] py-px text-[clamp(0.45rem,0.75cqw,0.6rem)] font-semibold ${reviewStatusClass}`}>{reviewStatusLabel}</span>
+                </div>
+                <p className="mt-[0.6cqw] line-clamp-2 text-[clamp(0.58rem,1cqw,0.78rem)] leading-[1.4] text-[#c9d1d9] [overflow-wrap:anywhere]">{reviewCommentary}</p>
+              </div>
+
+              <div data-share-stats className="grid min-w-0 grid-cols-2 gap-[0.6cqw]">
+                {shareStats.map(({ label, value, Icon }, index) => (
+                  <div key={label} className="share-card-stat share-card-motion min-w-0 rounded-md border border-[#30363d] bg-[#161b22] px-[0.8cqw] py-[0.6cqw]" style={{ animationDelay: `${150 + index * 35}ms` }}>
+                    <div className="flex min-w-0 items-center gap-[0.45cqw] text-[#8b949e]">
+                      <Icon className="size-[clamp(0.55rem,0.95cqw,0.72rem)] shrink-0" />
+                      <span className="truncate text-[clamp(0.45rem,0.72cqw,0.58rem)] uppercase tracking-wide">{label}</span>
+                    </div>
+                    <strong className="mt-[0.2cqw] block truncate text-[clamp(0.65rem,1.15cqw,0.9rem)] leading-none text-[#f0f6fc]">{value}</strong>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          <div className="flex h-[13%] min-h-14 items-center justify-between border-t border-[#21262d] bg-[#161b22] px-[5%] text-sm">
-            <span className="flex items-center gap-2 text-[#c9d1d9]"><GitBranch className="size-4 text-[#3fb950]" /> Review completed from public GitHub activity</span>
-            <span className="font-semibold text-[#58a6ff]">gitroast</span>
+          <div className="flex min-w-0 items-center justify-between gap-[2cqw] border-t border-[#21262d] bg-[#161b22] px-[5cqw] text-[clamp(0.6rem,1.2cqw,0.875rem)]">
+            <span className="share-card-footer-summary flex min-w-0 items-center gap-[1cqw] text-[#c9d1d9]"><GitBranch className="size-[clamp(0.75rem,1.5cqw,1rem)] shrink-0 text-[#3fb950]" /><span className="truncate">Reviewed {result.summary.analyzedRepoCount} repos · {result.summary.sampledCommitCount} commits</span></span>
+            <span className="share-card-activity flex items-center gap-[0.35cqw]" aria-label={`${result.summary.totalContributions} public contributions`}>
+              {activityLevels.map((level, index) => (
+                <span key={index} className="share-card-activity-cell share-card-motion size-[clamp(0.25rem,0.65cqw,0.45rem)] rounded-[1px] border border-black/20" style={{ backgroundColor: activityPalette[Math.min(level, 4)], animationDelay: `${180 + index * 18}ms` }} />
+              ))}
+            </span>
+            <span className="share-card-brand shrink-0 font-semibold text-[#58a6ff]">gitroast<span className="share-card-brand-suffix"> · unofficial</span></span>
           </div>
         </div>
       </div>
@@ -147,7 +260,7 @@ export function ShareCard({ result }: { result: RoastResponse }) {
       <aside className="github-box overflow-hidden self-start">
         <div className="github-box-header px-4 py-3 font-semibold">Share this review</div>
         <div className="p-4">
-          <p className="text-sm leading-6 text-[#8b949e]">Export the repository-style preview or invite someone to review the same public profile.</p>
+          <p className="text-sm leading-6 text-[#8b949e]">Export a 1200×630 review card with real profile stats, a repository verdict, and a share-ready roast.</p>
           <div className="mt-4 grid gap-2">
             <Button type="button" onClick={download} disabled={feedback === "downloading"}>
               {feedback === "downloading" ? <LoaderCircle className="size-4 animate-spin" /> : feedback === "downloaded" ? <Check className="size-4" /> : <Download className="size-4" />}
@@ -156,6 +269,10 @@ export function ShareCard({ result }: { result: RoastResponse }) {
             <Button type="button" variant="secondary" onClick={copyLink}>
               {feedback === "copied" ? <Check className="size-4" /> : <Link2 className="size-4" />}
               Copy profile link
+            </Button>
+            <Button type="button" variant="secondary" onClick={copyCaption}>
+              {feedback === "caption-copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
+              Copy roast caption
             </Button>
             <Button type="button" variant="secondary" onClick={share}>
               <Share2 className="size-4" /> Share review

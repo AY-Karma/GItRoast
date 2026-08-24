@@ -18,6 +18,54 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+export type ProfileScoreInput = {
+  recentActivityCount: number;
+  totalContributions: number;
+  sampledCommitCount: number;
+  totalStars: number;
+  totalForks: number;
+  followers: number;
+  shippingScore: number;
+  consistencyScore: number;
+  descriptionCoverage: number;
+  descriptiveCommitRatio: number;
+};
+
+function rootScale(value: number, target: number) {
+  return clamp(Math.round(Math.sqrt(clamp(value / target, 0, 1)) * 100), 0, 100);
+}
+
+export function calculateProfileScore(input: ProfileScoreInput) {
+  const activity = Math.round(
+    rootScale(input.recentActivityCount, 300) * 0.5
+      + rootScale(input.totalContributions, 1_500) * 0.35
+      + rootScale(input.sampledCommitCount, 12) * 0.15
+  );
+  const impact = Math.round(
+    rootScale(input.totalStars, 5_000) * 0.75
+      + rootScale(input.totalForks, 1_000) * 0.15
+      + rootScale(input.followers, 10_000) * 0.1
+  );
+  const maintenance = clamp(Math.round(input.shippingScore), 0, 100);
+  const consistency = clamp(Math.round(input.consistencyScore), 0, 100);
+  const presentation = Math.round(
+    clamp(input.descriptionCoverage, 0, 100) * 0.75
+      + clamp(input.descriptiveCommitRatio, 0, 1) * 100 * 0.25
+  );
+  const score = clamp(Math.round(
+    activity * 0.45
+      + impact * 0.25
+      + maintenance * 0.1
+      + consistency * 0.12
+      + presentation * 0.08
+  ), 1, 100);
+
+  return {
+    score,
+    breakdown: { activity, impact, maintenance, consistency, presentation }
+  };
+}
+
 export function calculateInactiveRepos(repos: GitHubRepo[]) {
   return repos.filter((repo) => !repo.fork && daysSince(repo.pushed_at) > 365).length;
 }
@@ -78,12 +126,32 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const commitSignals = snapshot.commits;
   const avgCommitLength = calculateAverageCommitLength(commitSignals);
   const todoDensity = estimateTodoDensity(repos, commitSignals);
-  const recentActivityCount = snapshot.contributions.filter((day) => daysSince(day.date) <= 90).reduce((sum, day) => sum + day.count, 0);
+  const recentContributionDays = snapshot.contributions.filter((day) => daysSince(day.date) <= 90);
+  const recentActivityCount = recentContributionDays.reduce((sum, day) => sum + day.count, 0);
+  const activeRecentDays = recentContributionDays.filter((day) => day.count > 0).length;
+  const totalContributions = snapshot.contributions.reduce((sum, day) => sum + day.count, 0);
   const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
   const totalForks = repos.reduce((sum, repo) => sum + repo.forks_count, 0);
-  const shippingScore = clamp(Math.round(100 - (inactiveRepos / Math.max(repos.length, 1)) * 100), 8, 98);
-  const consistencyScore = clamp(Math.round((recentActivityCount / Math.max(snapshot.contributions.length, 1)) * 12), 8, 96);
+  const shippingScore = repos.length
+    ? clamp(Math.round(100 - (inactiveRepos / repos.length) * 100), 0, 100)
+    : 0;
+  const consistencyScore = clamp(Math.round((activeRecentDays / 45) * 100), 0, 100);
   const languageDiversityScore = clamp(Math.round((languages.length / Math.max(repos.length, 1)) * 180), 10, 95);
+  const descriptiveCommitRatio = commitSignals.length
+    ? commitSignals.filter((commit) => commit.message.trim().length >= 20).length / commitSignals.length
+    : 0.5;
+  const { score: profileScore, breakdown: scoreBreakdown } = calculateProfileScore({
+    recentActivityCount,
+    totalContributions,
+    sampledCommitCount: snapshot.commits.length,
+    totalStars,
+    totalForks,
+    followers: snapshot.profile.followers,
+    shippingScore,
+    consistencyScore,
+    descriptionCoverage,
+    descriptiveCommitRatio
+  });
   const chaosScore = clamp(
     Math.round(100 - (descriptionCoverage * 0.28 + shippingScore * 0.34 + consistencyScore * 0.22) + todoDensity * 0.42),
     6,
@@ -115,9 +183,11 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
     shippingScore,
     consistencyScore,
     chaosScore,
+    profileScore,
+    scoreBreakdown,
     recentActivityCount,
     contributions: sortedContributions,
-    totalContributions: sortedContributions.reduce((sum, day) => sum + day.count, 0),
+    totalContributions,
     topPatterns: detectPatterns(repos, snapshot.commits),
     commitSamples: commitSignals.map((commit) => commit.message.slice(0, 180)).slice(0, 12),
     commitSignals: commitSignals.slice(0, 12).map((commit) => ({
@@ -127,9 +197,15 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
     })),
     repos: repos.slice(0, 20).map((repo) => ({
       name: repo.name,
+      url: repo.html_url,
       description: repo.description?.slice(0, 240) ?? null,
       language: repo.language,
       stars: repo.stargazers_count,
+      forks: repo.forks_count,
+      openIssues: repo.open_issues_count,
+      defaultBranch: repo.default_branch,
+      archived: repo.archived ?? false,
+      topics: repo.topics?.slice(0, 6) ?? [],
       pushedAt: repo.pushed_at
     }))
   };

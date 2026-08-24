@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "GitRoast - GitHub profile review",
     template: "%s - GitRoast"
@@ -35,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" data-scroll-behavior="smooth">
-      <body>
+      <body suppressHydrationWarning>
         <a href="#main-content" className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-md bg-[#238636] px-4 py-2 font-semibold text-white transition focus:translate-y-0">
           Skip to content
         </a>

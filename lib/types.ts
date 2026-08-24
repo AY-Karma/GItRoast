@@ -27,6 +27,8 @@ export type GitHubRepo = {
   size: number;
   open_issues_count: number;
   default_branch: string;
+  archived?: boolean;
+  topics?: string[];
 };
 
 export type CommitSignal = {
@@ -71,6 +73,14 @@ export type RoastSummary = {
   shippingScore: number;
   consistencyScore: number;
   chaosScore: number;
+  profileScore: number;
+  scoreBreakdown: {
+    activity: number;
+    impact: number;
+    maintenance: number;
+    consistency: number;
+    presentation: number;
+  };
   recentActivityCount: number;
   contributions: ContributionDay[];
   totalContributions: number;
@@ -79,9 +89,15 @@ export type RoastSummary = {
   commitSignals: CommitSignal[];
   repos: Array<{
     name: string;
+    url: string;
     description: string | null;
     language: string | null;
     stars: number;
+    forks: number;
+    openIssues: number;
+    defaultBranch: string;
+    archived: boolean;
+    topics: string[];
     pushedAt: string | null;
   }>;
 };
@@ -90,6 +106,12 @@ export type RoastReceipt = {
   title: string;
   evidence: string;
   punchline: string;
+};
+
+export type RepositoryRoast = {
+  name: string;
+  commentary: string;
+  status: "approved" | "commented" | "changes-requested";
 };
 
 export type RoastReport = {
@@ -101,6 +123,7 @@ export type RoastReport = {
   weaknesses: string[];
   receipts: RoastReceipt[];
   redemption: string;
+  repositoryRoasts: RepositoryRoast[];
   commitCrimes: Array<{
     message: string;
     commentary: string;

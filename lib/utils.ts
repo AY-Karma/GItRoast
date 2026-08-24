@@ -15,3 +15,9 @@ export function compactNumber(value: number) {
     maximumFractionDigits: 1
   }).format(value);
 }
+
+export function profileScoreColor(value: number) {
+  if (value >= 80) return "#3fb950";
+  if (value >= 60) return "#d29922";
+  return "#f85149";
+}

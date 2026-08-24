@@ -42,6 +42,12 @@ a { color: var(--accent-fg); }
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
 }
 
+.app-shell {
+  width: 100%;
+  max-width: 2200px;
+  margin-inline: auto;
+}
+
 .github-box {
   border: 1px solid var(--border-default);
   border-radius: 6px;
@@ -52,6 +58,70 @@ a { color: var(--accent-fg); }
   border-bottom: 1px solid var(--border-default);
   border-radius: 6px 6px 0 0;
   background: var(--canvas-subtle);
+}
+
+[data-share-card][data-exporting="true"] .share-card-motion {
+  opacity: 1 !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+@container (max-width: 700px) {
+  .share-card-details,
+  .share-card-activity {
+    display: none;
+  }
+}
+
+@container (max-width: 500px) {
+  .share-card-main {
+    grid-template-columns: 3.5rem minmax(0, 1fr) 3.5rem;
+    column-gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .share-card-username {
+    overflow: hidden;
+    font-size: 0.55rem;
+    overflow-wrap: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .share-card-identity [data-share-title] {
+    margin-top: 0.35rem;
+    font-size: 1.25rem;
+    line-height: 1.05;
+  }
+
+  .share-card-identity p {
+    margin-top: 0.55rem;
+    font-size: 0.6rem;
+    line-height: 1.35;
+  }
+
+  .share-card-score {
+    padding: 0.4rem;
+  }
+
+  .share-card-score strong {
+    font-size: 1.5rem;
+  }
+
+  .share-card-score-label {
+    font-size: 0.45rem;
+  }
+
+  .share-card-score-label-prefix,
+  .share-card-score-unit,
+  .share-card-score-verdict,
+  .share-card-brand-suffix {
+    display: none;
+  }
+
+  .share-card-footer-summary {
+    max-width: 65%;
+  }
 }
 
 .markdown-body h1,
@@ -68,13 +138,156 @@ a { color: var(--accent-fg); }
 .markdown-body p { margin: 0 0 16px; }
 .markdown-body code { font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace; }
 
-.octicon-spin { animation: octicon-spin 1s linear infinite; }
-.result-enter { animation: result-enter 240ms ease-out both; }
+.repo-review-row {
+  position: relative;
+}
+
+.repo-review-row::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--accent-fg);
+  content: "";
+  transform: scaleY(0);
+  transform-origin: center;
+}
+
+.repo-review-row:hover,
+.repo-review-row:focus-within {
+  background: rgba(177, 186, 196, 0.04);
+}
+
+.repo-review-row:hover::before,
+.repo-review-row:focus-within::before {
+  transform: scaleY(1);
+}
+
+.repo-review-row:hover .review-comment,
+.repo-review-row:focus-within .review-comment {
+  border-color: #484f58;
+}
+
+.commit-timeline-item::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 28px;
+  width: 2px;
+  background: var(--border-muted);
+  content: "";
+}
+
+.commit-timeline-item:first-child::before { top: 28px; }
+.commit-timeline-item:last-child::before { bottom: calc(100% - 28px); }
+
+.report-nav-link { border-color: transparent; }
+.report-nav-link[href="#verdict"] {
+  border-color: #f78166;
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+body:has(#receipts:target, #commits:target, #repositories:target, #share:target) .report-nav-link[href="#verdict"] {
+  border-color: transparent;
+  color: #c9d1d9;
+  font-weight: 400;
+}
+
+body:has(#receipts:target) .report-nav-link[href="#receipts"],
+body:has(#commits:target) .report-nav-link[href="#commits"],
+body:has(#repositories:target) .report-nav-link[href="#repositories"],
+body:has(#share:target) .report-nav-link[href="#share"] {
+  border-color: #f78166;
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .octicon-spin { animation: octicon-spin 1s linear infinite; }
+  .result-enter { animation: result-enter 220ms ease-out both; }
+  .review-stagger { animation: review-thread-enter 190ms ease-out both; }
+  .review-summary-enter { animation: review-summary-enter 200ms ease-out 70ms both; }
+  .review-status-pop { animation: review-status-pop 160ms ease-out 170ms both; }
+  .score-fill { animation: score-fill 420ms ease-out 140ms both; transform-origin: left; }
+  .file-state-row { animation: file-state-enter 160ms ease-out both; }
+  .file-status-resolve { animation: review-status-pop 150ms ease-out both; }
+  .share-card-avatar { animation: share-card-avatar-enter 220ms ease-out both; }
+  .share-card-identity { animation: share-card-content-enter 200ms ease-out 45ms both; }
+  .share-card-score { animation: share-card-score-enter 220ms ease-out 85ms both; }
+  .share-card-review { animation: share-card-content-enter 200ms ease-out 120ms both; }
+  .share-card-stat { animation: share-card-content-enter 180ms ease-out both; }
+  .share-card-activity-cell { animation: share-card-activity-enter 150ms ease-out both; }
+  .share-card-score-fill { animation: score-fill 440ms ease-out 180ms both; transform-origin: left; }
+
+  .stat-card,
+  .repo-review-row,
+  .repo-review-row::before,
+  .review-comment,
+  .review-repo-icon,
+  .report-nav-link,
+  .share-card-preview {
+    transition-duration: 140ms;
+    transition-property: background-color, border-color, box-shadow, color, transform;
+    transition-timing-function: ease;
+  }
+
+  .stat-card:hover {
+    border-color: #484f58;
+    transform: translateY(-1px);
+  }
+
+  .repo-review-row:hover .review-repo-icon,
+  .repo-review-row:focus-within .review-repo-icon {
+    transform: scale(1.08);
+  }
+
+  .share-card-preview:hover {
+    border-color: #484f58;
+    box-shadow: 0 12px 32px rgba(1, 4, 9, 0.28);
+    transform: translateY(-2px);
+  }
+}
 
 @keyframes octicon-spin { to { transform: rotate(360deg); } }
 @keyframes result-enter {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes review-thread-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes review-summary-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes review-status-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes score-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes file-state-enter {
+  from { opacity: 0; transform: translateX(-3px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes share-card-avatar-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes share-card-content-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes share-card-score-enter {
+  from { opacity: 0; transform: translateX(5px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes share-card-activity-enter {
+  from { opacity: 0; transform: scale(0.75); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

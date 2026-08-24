@@ -37,7 +37,7 @@ async function buildRoast(username: string): Promise<RoastResponse> {
   }
 }
 
-const getCachedRoast = unstable_cache(buildRoast, ["gitroast-v6"], {
+const getCachedRoast = unstable_cache(buildRoast, ["gitroast-v9"], {
   revalidate: 60 * 60
 });
 

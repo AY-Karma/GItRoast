@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { roastGitHubProfile, RoastRequestError } from "@/lib/roast";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 const MAX_BODY_BYTES = 1_024;
 
 class ApiInputError extends Error {

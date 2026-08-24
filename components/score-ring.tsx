@@ -1,5 +1,8 @@
+import { profileScoreColor } from "@/lib/utils";
+
 export function ScoreRing({ value }: { value: number }) {
   const normalized = Math.min(100, Math.max(0, Math.round(value)));
+  const scoreColor = profileScoreColor(normalized);
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (normalized / 100) * circumference;
 
@@ -7,7 +10,7 @@ export function ScoreRing({ value }: { value: number }) {
     <div
       className="relative size-40 shrink-0"
       role="meter"
-      aria-label="Roast score"
+      aria-label="Profile score"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={normalized}
@@ -19,7 +22,7 @@ export function ScoreRing({ value }: { value: number }) {
           cx="64"
           cy="64"
           r="54"
-          stroke="#f85149"
+          stroke={scoreColor}
           strokeWidth="8"
           strokeLinecap="round"
           fill="none"

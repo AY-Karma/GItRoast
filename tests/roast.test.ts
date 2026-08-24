@@ -25,6 +25,14 @@ function summary(username: string, repoName: string): RoastSummary {
     shippingScore: 44,
     consistencyScore: 38,
     chaosScore: 67,
+    profileScore: 61,
+    scoreBreakdown: {
+      activity: 55,
+      impact: 24,
+      maintenance: 44,
+      consistency: 38,
+      presentation: 54
+    },
     recentActivityCount: 29,
     contributions: [],
     totalContributions: 412,
@@ -35,8 +43,8 @@ function summary(username: string, repoName: string): RoastSummary {
       { repo: "weekend-lab", message: "temporary parser cleanup", date: "2026-08-18T00:00:00Z" }
     ],
     repos: [
-      { name: repoName, description: "A focused developer tool", language: "TypeScript", stars: 72, pushedAt: "2026-08-20T00:00:00Z" },
-      { name: "weekend-lab", description: null, language: "Rust", stars: 19, pushedAt: "2024-01-01T00:00:00Z" }
+      { name: repoName, url: `https://github.com/${username}/${repoName}`, description: "A focused developer tool", language: "TypeScript", stars: 72, forks: 3, openIssues: 2, defaultBranch: "main", archived: false, topics: ["developer-tools"], pushedAt: "2026-08-20T00:00:00Z" },
+      { name: "weekend-lab", url: `https://github.com/${username}/weekend-lab`, description: null, language: "Rust", stars: 19, forks: 0, openIssues: 12, defaultBranch: "master", archived: false, topics: [], pushedAt: "2024-01-01T00:00:00Z" }
     ]
   };
 }
@@ -52,6 +60,9 @@ describe("fallback roast", () => {
     expect(first.roast).not.toBe(second.roast);
     expect(first.roast).toContain("alpha-console");
     expect(first.receipts).toHaveLength(3);
+    expect(first.repositoryRoasts).toHaveLength(2);
+    expect(new Set(first.repositoryRoasts.map((repo) => repo.commentary)).size).toBe(2);
+    expect(first.repositoryRoasts.every((repo) => repo.commentary.includes(repo.name))).toBe(true);
     expect(first.receipts.every((receipt) => receipt.evidence && receipt.punchline)).toBe(true);
     expect(first.redemption).toContain("alpha-console");
   });
@@ -99,5 +110,50 @@ describe("fallback roast", () => {
 
     expect(report.roast).not.toContain("disgusting fraud");
     expect(report.roast).toContain("alpha-console");
+  });
+
+  it("keeps profile scoring deterministic instead of accepting a model-provided number", () => {
+    const input = summary("score-owner", "score-console");
+    const report = normalizeReport({ roastScore: 99 }, input);
+
+    expect(report.roastScore).toBe(input.profileScore);
+  });
+
+  it("rejects invented or person-level repository comments", () => {
+    const input = summary("safe-review", "alpha-console");
+    const report = normalizeReport({
+      repositoryRoasts: [
+        { name: "invented-repo", commentary: "invented-repo is fine" },
+        { name: "alpha-console", commentary: "alpha-console proves you are an idiot" }
+      ]
+    }, input);
+
+    expect(report.repositoryRoasts.map((repo) => repo.name)).toEqual(["alpha-console", "weekend-lab"]);
+    expect(report.repositoryRoasts[0]?.commentary).not.toContain("idiot");
+  });
+
+  it("accepts a safe repository comment only when it cites repository evidence", () => {
+    const input = summary("safe-review", "alpha-console");
+    const grounded = "alpha-console uses TypeScript and has enough context to make this review inconveniently short.";
+    const report = normalizeReport({
+      repositoryRoasts: [
+        { name: "alpha-console", commentary: grounded },
+        { name: "weekend-lab", commentary: "weekend-lab exists in public." }
+      ]
+    }, input);
+
+    expect(report.repositoryRoasts[0]?.commentary).toBe(grounded);
+    expect(report.repositoryRoasts[1]?.commentary).not.toBe("weekend-lab exists in public.");
+  });
+
+  it("treats archived repositories as a completed lifecycle instead of a failure", () => {
+    const input = summary("archive-owner", "active-console");
+    input.repos[1].archived = true;
+
+    const report = generateFallbackRoast(input);
+    const archived = report.repositoryRoasts.find((repo) => repo.name === "weekend-lab");
+
+    expect(archived?.status).toBe("approved");
+    expect(archived?.commentary.toLowerCase()).toMatch(/archiv|finished|ending/);
   });
 });
