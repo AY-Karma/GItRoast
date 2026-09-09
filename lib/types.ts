@@ -51,6 +51,13 @@ export type GitHubSnapshot = {
   source: "github-api" | "public-profile";
 };
 
+export type RepositoryEvidence = {
+  readmeExcerpt?: string;
+  runtimeDependencies?: number;
+  scriptNames?: string[];
+  latestRelease?: { tag: string; publishedAt: string };
+};
+
 export type RoastSummary = {
   username: string;
   displayName: string | null;
@@ -99,6 +106,7 @@ export type RoastSummary = {
     archived: boolean;
     topics: string[];
     pushedAt: string | null;
+    evidence?: RepositoryEvidence;
   }>;
 };
 
@@ -118,6 +126,7 @@ export type RoastReport = {
   developerType: string;
   archetypeDescription: string;
   roastScore: number;
+  scoreRoast: string;
   roast: string;
   strengths: string[];
   weaknesses: string[];

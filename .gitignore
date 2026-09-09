@@ -56,4 +56,5 @@ pnpm-debug.log*
 .eslintcache
 .stylelintcache
 coverage/
+artifacts/roast-evaluation/
 .nyc_output/

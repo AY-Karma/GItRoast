@@ -32,7 +32,7 @@ body {
   line-height: 1.5;
 }
 
-button, input { font: inherit; }
+button, input { font-family: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: var(--accent-fg); }
 ::selection { background: rgba(56, 139, 253, 0.4); }
@@ -141,6 +141,8 @@ a { color: var(--accent-fg); }
 .repo-review-row {
   position: relative;
 }
+
+#report { overflow-wrap: anywhere; }
 
 .repo-review-row::before {
   position: absolute;

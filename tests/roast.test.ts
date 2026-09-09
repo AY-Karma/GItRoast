@@ -1,55 +1,62 @@
 import { describe, expect, it } from "vitest";
 import { generateFallbackRoast, normalizeReport } from "@/lib/openai";
-import type { RoastSummary } from "@/lib/types";
+import { summary } from "./fixtures/roast-summary";
 
-function summary(username: string, repoName: string): RoastSummary {
-  return {
-    username,
-    displayName: username,
-    avatarUrl: `https://github.com/${username}.png`,
-    githubUrl: `https://github.com/${username}`,
-    followers: 73,
-    accountAgeYears: 6,
-    repoCount: 14,
-    analyzedRepoCount: 12,
-    sampledCommitCount: 2,
-    dataSource: "github-api",
-    inactiveRepos: 8,
-    totalStars: 91,
-    totalForks: 11,
-    languages: ["TypeScript", "Rust"],
-    avgCommitLength: 18,
-    descriptionCoverage: 42,
-    todoDensity: 24,
-    languageDiversityScore: 30,
-    shippingScore: 44,
-    consistencyScore: 38,
-    chaosScore: 67,
-    profileScore: 61,
-    scoreBreakdown: {
-      activity: 55,
-      impact: 24,
-      maintenance: 44,
-      consistency: 38,
-      presentation: 54
-    },
-    recentActivityCount: 29,
-    contributions: [],
-    totalContributions: 412,
-    topPatterns: [`${repoName} has eight repos waiting for a sequel`],
-    commitSamples: ["fix final thing again", "temporary parser cleanup"],
-    commitSignals: [
-      { repo: repoName, message: "fix final thing again", date: "2026-08-20T00:00:00Z" },
-      { repo: "weekend-lab", message: "temporary parser cleanup", date: "2026-08-18T00:00:00Z" }
-    ],
-    repos: [
-      { name: repoName, url: `https://github.com/${username}/${repoName}`, description: "A focused developer tool", language: "TypeScript", stars: 72, forks: 3, openIssues: 2, defaultBranch: "main", archived: false, topics: ["developer-tools"], pushedAt: "2026-08-20T00:00:00Z" },
-      { name: "weekend-lab", url: `https://github.com/${username}/weekend-lab`, description: null, language: "Rust", stars: 19, forks: 0, openIssues: 12, defaultBranch: "master", archived: false, topics: [], pushedAt: "2024-01-01T00:00:00Z" }
-    ]
-  };
-}
 
 describe("fallback roast", () => {
+  it("keeps artifact-directed second person, novel titles, and score-only evidence", () => {
+    const input = summary("alice-dev", "alpha-console");
+    const roast = "Your alpha-console has 72 stars. The review committee now needs overflow seating.";
+    const scoreRoast = "61/100. The merge button is negotiating terms.";
+    const result = normalizeReport({ roast, scoreRoast, developerType: "The Reluctant Release Committee" }, input);
+    expect(result.roast).toBe(roast);
+    expect(result.scoreRoast).toBe(scoreRoast);
+    expect(result.developerType).toBe("The Reluctant Release Committee");
+    expect(normalizeReport({ scoreRoast: "Activity at 55; the sprint board requests an explanation." }, input).scoreRoast).toContain("Activity at 55");
+    expect(normalizeReport({ scoreRoast: "99/100. Perfect." }, input).scoreRoast).not.toContain("99/100");
+    expect(normalizeReport({ scoreRoast: "alpha-console gets 99/100. Perfect." }, input).scoreRoast).not.toContain("99/100");
+  });
+
+  it("replaces repeated lines individually while keeping other valid lines", () => {
+    const input = summary("alice-dev", "alpha-console");
+    const repeated = "alpha-console has 72 stars. The audience has formed a review committee.";
+    const unique = "Your TypeScript is taking attendance before allowing the meeting to compile.";
+    const rejected: string[] = [];
+    const report = normalizeReport({ roast: repeated, strengths: [repeated, unique, "412 contributions have made the calendar eligible for overtime."] }, input, rejected);
+    expect(report.roast).toBe(repeated);
+    expect(report.strengths).not.toContain(repeated);
+    expect(report.strengths).toContain(unique);
+    expect(rejected).toContain("strengths.0");
+  });
+
+  it("does not classify unknown push dates as inactivity", () => {
+    const input = summary("unknown-dates", "alpha-console");
+    input.repos[0].pushedAt = null;
+    const report = generateFallbackRoast(input);
+    expect(report.repositoryRoasts[0].status).not.toBe("changes-requested");
+    expect(report.repositoryRoasts[0].commentary).toContain("unavailable");
+  });
+
+  it("keeps a clear commit subject defensible in the main roast as well", () => {
+    const input = summary("careful-dev", "parser");
+    input.commitSamples = ["Reject invalid UTF-8 before parsing headers"];
+    const report = generateFallbackRoast(input);
+    expect(report.roast).toContain("supplied actual context");
+    expect(report.roast).not.toContain("declined to provide an alibi");
+  });
+
+  it("does not invent repository defects when no original repos were available", () => {
+    const input = summary("new-dev", "none");
+    input.repos = [];
+    input.commitSamples = [];
+    input.commitSignals = [];
+    input.repoCount = input.analyzedRepoCount = input.inactiveRepos = 0;
+    const report = generateFallbackRoast(input);
+    expect(report.repositoryRoasts).toEqual([]);
+    expect(report.commitCrimes).toEqual([]);
+    expect(report.roast).toContain("no original public repositories");
+    expect(report.redemption).toContain("private work");
+  });
   it("builds stable, evidence-specific reports instead of repeating one archetype", () => {
     const first = generateFallbackRoast(summary("alice-dev", "alpha-console"));
     const repeat = generateFallbackRoast(summary("alice-dev", "alpha-console"));
@@ -59,6 +66,8 @@ describe("fallback roast", () => {
     expect(first.developerType).not.toBe(second.developerType);
     expect(first.roast).not.toBe(second.roast);
     expect(first.roast).toContain("alpha-console");
+    expect(first.scoreRoast).toContain("61");
+    expect(first.archetypeDescription.length).toBeLessThanOrEqual(180);
     expect(first.receipts).toHaveLength(3);
     expect(first.repositoryRoasts).toHaveLength(2);
     expect(new Set(first.repositoryRoasts.map((repo) => repo.commentary)).size).toBe(2);

@@ -9,11 +9,13 @@ export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+const compactFormatter = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1
+});
+
 export function compactNumber(value: number) {
-  return Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 1
-  }).format(value);
+  return compactFormatter.format(value);
 }
 
 export function profileScoreColor(value: number) {

@@ -109,44 +109,58 @@ export function repoAwareDeveloperType(summary: RoastSummary) {
 }
 
 export function repoAwareRoast(summary: RoastSummary) {
-  const flavor = buildRepoFlavor(summary);
-  const repoSetup = summary.inactiveRepos > 0
-    ? choose(summary, "inactive-setup", [
-        `@${summary.username}'s profile has ${summary.repoCount} public repos, and ${summary.inactiveRepos} of the sampled originals have quietly entered long-term support.`,
-        `${summary.repoCount} public repos made the roll call; ${summary.inactiveRepos} answered with an out-of-office message dated over a year ago.`,
-        `The repository list is ${summary.repoCount} projects deep, with ${summary.inactiveRepos} sampled repos currently majoring in historical preservation.`
-      ] as const)
-    : `All ${summary.analyzedRepoCount} sampled original repos still show signs of life, which is suspiciously responsible behavior for GitHub.`;
-  const projectLine = choose(summary, "project-line", [
-    `${flavor.primaryRepo} is carrying the main plot while ${flavor.secondaryRepo} keeps asking whether this is a product roadmap or a very committed side quest.`,
-    `${flavor.primaryRepo} has the confident name; ${flavor.secondaryRepo} has the energy of a tab that has been open since Tuesday.`,
-    `Between ${flavor.primaryRepo} and ${flavor.secondaryRepo}, the ${flavor.languageBlend} stack is less a technology choice and more a group chat.`
-  ] as const);
+  const primary = summary.repos[0];
+  if (!primary) return `@${summary.username} supplied no original public repositories for inspection. The evidence locker has excellent negative space. Private work remains outside this review's jurisdiction.`;
+  const opening = summary.inactiveRepos > 0
+    ? `${summary.analyzedRepoCount} sampled originals; ${summary.inactiveRepos} have gone a year without a public push. The review now includes a waiting room.`
+    : `${summary.analyzedRepoCount} sampled originals and none counted as quiet for a year. The prosecution would like less responsible source material.`;
+  const project = primary.archived
+    ? `${primary.name} is archived: a project that actually found the end of its roadmap.`
+    : !primary.description?.trim() && primary.stars > 0
+      ? `${primary.name} has ${primary.stars} stars and no repository description. The audience arrived before the introduction.`
+      : choose(summary, "profile-project", [
+          `${primary.name} brings ${primary.language ?? "an unspecified language"} and ${primary.stars} stars to the hearing. The compiler was not available for cross-examination.`,
+          `${primary.name}: ${primary.stars} stars, ${primary.forks} forks. Even the metadata has invited witnesses.`
+        ] as const);
   const commit = summary.commitSamples[0];
-  const commitLine = commit
-    ? choose(summary, "commit-line", [
-        `Then the commit subject “${cleanSnippet(commit)}” arrived and declined to provide an alibi.`,
-        `The commit log contributed “${cleanSnippet(commit)}”, a complete sentence only in the legal sense.`,
-        `A recent push was labelled “${cleanSnippet(commit)}”, which is exactly the amount of context future-you apparently deserved.`
-      ] as const)
-    : `The public commit trail brought no subjects to the hearing, so the repo names had to do all the comedic labor.`;
-
-  return `${repoSetup} ${projectLine} ${commitLine}`;
+  const closing = commit
+    ? isVagueCommit(commit)
+      ? `The commit subject "${cleanSnippet(commit)}" has applied for witness protection.`
+      : `Then "${cleanSnippet(commit)}" supplied actual context. Very inconvenient for the prosecution.`
+    : `No recent public commit subjects were available. The transcript ends before anyone can object.`;
+  return `${opening} ${project} ${closing}`;
 }
 
 export function repoAwareArchetype(summary: RoastSummary) {
+  if (summary.repos.length < 2) return summary.repos.length
+    ? `${summary.repos[0].name} is the sole original repository in this sample. The entire portfolio meeting fits in one tab.`
+    : `@${summary.username} has supplied no original public repositories. An unusually minimalist submission to a code review.`;
   const flavor = buildRepoFlavor(summary);
-  const activity = summary.recentActivityCount > 0
-    ? `${summary.recentActivityCount} visible contributions in the recent window`
-    : "a contribution graph practicing minimalism";
   return choose(summary, "archetype", [
-    `A ${flavor.languageBlend} builder whose public universe revolves around ${flavor.primaryRepo}, ${flavor.secondaryRepo}, and ${activity}. The work is real; the filing system has improv energy.`,
-    `Part maintainer, part side-quest curator: ${flavor.primaryRepo} gets the spotlight, ${flavor.secondaryRepo} gets the sequel tease, and the graph supplies ${activity}.`,
-    `A public-work catalog powered by ${flavor.languageBlend}, anchored by ${flavor.primaryRepo}, and held together by the optimistic belief that every repo can become the main repo.`
+    `${flavor.primaryRepo} carries the plot; ${flavor.secondaryRepo} is the side quest still asking for another sprint.`,
+    `${flavor.languageBlend} powers the profile, while ${flavor.primaryRepo} bravely pretends the other repos are part of the roadmap.`,
+    `${flavor.primaryRepo} is the main character in a profile where every repository auditioned for the role.`
+  ] as const);
+}
+
+export function repoAwareScoreRoast(summary: RoastSummary) {
+  const flavor = buildRepoFlavor(summary);
+  const factors = Object.entries(summary.scoreBreakdown) as Array<[keyof RoastSummary["scoreBreakdown"], number]>;
+  const [strongest, strongestValue] = factors.reduce((best, factor) => factor[1] > best[1] ? factor : best);
+  const [weakest, weakestValue] = factors.reduce((worst, factor) => factor[1] < worst[1] ? factor : worst);
+  return choose(summary, "score-roast", [
+    `${summary.profileScore}/100. ${flavor.primaryRepo} kept ${strongest} at ${strongestValue}; ${weakest} showed up with ${weakestValue} and no alibi.`,
+    `${summary.profileScore}/100: enough signal to merge, enough ${weakest} debt (${weakestValue}) to keep the roast employed.`,
+    `${strongest} did the carrying at ${strongestValue}. ${weakest} contributed ${weakestValue} and the confidence of an unreviewed hotfix.`
   ] as const);
 }
 
 export function repoAwareStrengths(summary: RoastSummary) {
+  if (!summary.repos.length) return [
+    `@${summary.username}'s public profile can be reviewed without pretending private work was inspected`,
+    `${summary.totalContributions} visible contributions are recorded separately from the missing repository sample`,
+    `No original public repositories means no invented repository defects. The review has discovered restraint`
+  ];
   const flavor = buildRepoFlavor(summary);
   const primary = summary.repos[0];
   return [
@@ -166,33 +180,37 @@ export function repoAwareStrengths(summary: RoastSummary) {
 }
 
 export function repoAwareWeaknesses(summary: RoastSummary) {
+  if (!summary.repos.length) return [
+    `No original public repositories were available; the case against @${summary.username}'s code cannot proceed`,
+    `Repository documentation is outside this empty sample. The reviewer has been asked to stop guessing`,
+    `Private work is unknown. This review's jurisdiction ends at the public profile`
+  ];
   const flavor = buildRepoFlavor(summary);
   const vagueCommit = summary.commitSamples.find(isVagueCommit);
   return [
     summary.inactiveRepos > 0
-      ? `${summary.inactiveRepos} sampled repos need an archive badge, a status note, or a very small retirement party`
-      : `The active repo list could still use clearer “start here” signposts`,
+      ? `${summary.inactiveRepos} sampled repos have been silent for a year; archive them before GitHub starts carbon-dating the default branches`
+      : `No sampled originals have a year-long public push gap. The inactivity allegation has been withdrawn`,
     summary.descriptionCoverage < 70
-      ? `Only ${summary.descriptionCoverage}% of sampled original repos have descriptions; several projects are relying on telepathy`
-      : `${summary.descriptionCoverage}% description coverage is solid, but ${flavor.secondaryRepo} can still tell visitors what success looks like`,
+      ? `Only ${summary.descriptionCoverage}% of sampled original repos have descriptions; the rest shipped a guessing game as their onboarding flow`
+      : `${summary.descriptionCoverage}% description coverage leaves little room for the usual missing-context allegation`,
     vagueCommit
       ? `“${cleanSnippet(vagueCommit)}” could use one noun explaining what changed and one clue explaining why`
       : summary.commitSamples.length
         ? `The commit subjects are annoyingly clear; mirror that context in the quieter repository descriptions`
         : `No public commit subjects were available, leaving the review timeline dramatically under-captioned`,
-    `${flavor.primaryRepo} deserves a crisp status section so the main project does not have to explain the whole profile alone`
+    `${flavor.primaryRepo}'s metadata is on the stand; its implementation has not been inspected. The roast cannot subpoena imaginary bugs`
   ].slice(0, 4);
 }
 
 export function repoAwareReceipts(summary: RoastSummary): RoastReceipt[] {
-  const flavor = buildRepoFlavor(summary);
   const commit = summary.commitSamples[0];
   return [
     {
       title: "Repository archaeology",
       evidence: `${summary.inactiveRepos} of ${summary.analyzedRepoCount} sampled original repos have been quiet for over a year.`,
-      punchline: choose(summary, "receipt-repos", [
-        `${flavor.secondaryRepo} is not abandoned; it is preserving the exact moment the weekend ended.`,
+      punchline: summary.inactiveRepos === 0 ? "No year-quiet originals counted. The fossil exhibit has been cancelled for lack of exhibits." : choose(summary, "receipt-repos", [
+        `The quiet repositories have turned the push calendar into a period piece.`,
         `That is less a backlog and more a carefully indexed fossil record.`,
         `The archive button has started drafting its own pull request.`
       ] as const)
@@ -217,27 +235,28 @@ export function repoAwareReceipts(summary: RoastSummary): RoastReceipt[] {
     {
       title: "Documentation checksum",
       evidence: `${summary.descriptionCoverage}% description coverage across sampled original repositories.`,
-      punchline: choose(summary, "receipt-docs", [
-        `${flavor.primaryRepo} has a name; the quieter repos are still waiting for their one-sentence origin story.`,
+      punchline: summary.descriptionCoverage >= 90 ? "The descriptions have supplied context. The mystery department has been made redundant." : choose(summary, "receipt-docs", [
+        `A blank repository description leaves the premise as an exercise for the reader.`,
         `Visitors should not need repository forensics before deciding where to click.`,
-        `A README is documentation. A mysterious repo name is merely atmosphere.`
+        `Repository descriptions are the trailer. Some projects appear to be saving theirs for the sequel.`
       ] as const)
     }
   ];
 }
 
 export function repoAwareRedemption(summary: RoastSummary) {
-  const flavor = buildRepoFlavor(summary);
-  const commitAdvice = summary.commitSamples[0]
-    ? `give the next commit subject one clear “what” and one useful “why”`
-    : "surface one recent change with a descriptive commit subject";
-  return `Start with ${flavor.primaryRepo}: add a crisp status note, label or archive one quiet side quest, and ${commitAdvice}. Same personality, much easier archaeology.`;
+  const primary = summary.repos[0];
+  if (!primary) return `For @${summary.username}, choose a public project to share if appropriate. The review can wait; private work does not owe it an exhibit.`;
+  if (!primary.description?.trim()) return `Start with ${primary.name}: add a one-sentence repository description explaining its purpose. Give the audience a premise before commissioning the sequel.`;
+  if (summary.commitSamples.some(isVagueCommit)) return `For the next ${primary.name} commit, name the change and the reason. The diff deserves a caption, not a missing-person poster.`;
+  if (summary.inactiveRepos > 0) return `Keep ${primary.name} as the starting point and check whether the year-quiet repositories should be marked complete, maintained, or archived. Status is cheaper than suspense.`;
+  return `Keep ${primary.name}'s public context current as it evolves. No invented emergency patch: the roast will have to find honest work.`;
 }
 
 function isQuietRepo(pushedAt: string | null) {
-  if (!pushedAt) return true;
+  if (!pushedAt) return false;
   const pushedTime = new Date(pushedAt).getTime();
-  return !Number.isFinite(pushedTime) || Date.now() - pushedTime > 365 * 24 * 60 * 60 * 1000;
+  return Number.isFinite(pushedTime) && Date.now() - pushedTime > 365 * 24 * 60 * 60 * 1000;
 }
 
 function repositoryReviewStatus(repo: RoastSummary["repos"][number]): RepositoryRoast["status"] {
@@ -256,6 +275,18 @@ function repoCommentary(summary: RoastSummary, repo: RoastSummary["repos"][numbe
       `${repo.name} completed its character arc and earned the Archive badge instead of pretending the roadmap is still loading.`,
       `${repo.name} is a finished exhibit, not an abandoned crime scene. The roast approves this unusually honest lifecycle state.`
     ] as const);
+  }
+
+  const dependencies = repo.evidence?.runtimeDependencies;
+  if (dependencies !== undefined && dependencies >= 20 && /\b(minimal|tiny|lightweight|zero.dependencies)\b/i.test(`${repo.description ?? ""} ${repo.evidence?.readmeExcerpt ?? ""}`)) {
+    return choose(summary, `${salt}:dependencies`, [
+      `${repo.name} promises minimalism with ${dependencies} runtime dependencies in package.json. The entourage would like separate billing.`,
+      `${repo.name}: ${dependencies} runtime dependencies for the lightweight pitch. Apparently the adjective was measured before installation.`
+    ] as const);
+  }
+
+  if (!repo.pushedAt || !Number.isFinite(new Date(repo.pushedAt).getTime())) {
+    return `${repo.name} has ${repo.stars} stars and an unavailable public push date. The review declines to turn a missing timestamp into a retirement announcement.`;
   }
 
   if (!repo.description?.trim()) {

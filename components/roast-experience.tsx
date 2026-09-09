@@ -41,11 +41,12 @@ function LoadingStage({ username }: { username: string }) {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setStep((current) => Math.min(current + 1, loadingSteps.length - 1));
+    if (step === loadingSteps.length - 1) return;
+    const timer = window.setTimeout(() => {
+      setStep((current) => current + 1);
     }, 850);
-    return () => window.clearInterval(interval);
-  }, []);
+    return () => window.clearTimeout(timer);
+  }, [step]);
 
   return (
     <div className="github-box mt-4 overflow-hidden" role="status" aria-live="polite">
@@ -133,6 +134,7 @@ function RepositoryHeader({ result, isLoading, username }: { result: RoastRespon
 
 function FileList({ isLoading, hasResult }: { isLoading: boolean; hasResult: boolean }) {
   const state = hasResult ? "complete" : isLoading ? "running" : "waiting";
+  const stateLabel = hasResult ? "review ready" : isLoading ? "analysis running" : "waiting for a username";
   const rows = [
     ["profile.json", "Public profile and repository metadata", state],
     ["activity.log", "Recent public timeline and contribution signals", state],
@@ -140,11 +142,15 @@ function FileList({ isLoading, hasResult }: { isLoading: boolean; hasResult: boo
   ];
 
   return (
-    <div className="github-box overflow-hidden">
-      <div className="github-box-header flex items-center justify-between px-4 py-3 text-xs">
-        <span className="flex items-center gap-2 font-semibold"><GitBranch className="size-4" /> main</span>
-        <span className="text-[#8b949e]">3 files</span>
-      </div>
+    <details className="github-box group overflow-hidden">
+      <summary className="github-box-header flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-xs hover:bg-[#21262d] [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 font-semibold"><GitBranch className="size-4" /> Review pipeline</span>
+        <span className="flex min-w-0 items-center gap-3 text-[#8b949e]">
+          <span className="hidden truncate sm:inline">{stateLabel}</span>
+          <span className="shrink-0">3 files</span>
+          <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" />
+        </span>
+      </summary>
       <div className="divide-y divide-[#21262d]">
         {rows.map(([name, message, status], index) => (
           <div key={name} className="file-state-row grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(150px,.8fr)_1.3fr_auto] sm:items-center" style={{ animationDelay: `${index * 35}ms` }}>
@@ -157,7 +163,7 @@ function FileList({ isLoading, hasResult }: { isLoading: boolean; hasResult: boo
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -187,7 +193,7 @@ export function RoastExperience() {
     setResult(null);
     setIsLoading(true);
     setError("");
-    void import("@/components/roast-report");
+    void import("@/components/roast-report").catch(() => {});
 
     try {
       const response = await fetch("/api/roast", {
@@ -206,10 +212,6 @@ export function RoastExperience() {
       if (requestId !== requestIdRef.current) return;
       setResult(payload as RoastResponse);
       window.history.replaceState(null, "", `?u=${encodeURIComponent(clean)}`);
-      window.setTimeout(() => {
-        document.getElementById("report")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        reportHeadingRef.current?.focus({ preventScroll: true });
-      }, 120);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
       if (requestId === requestIdRef.current) {
@@ -236,18 +238,19 @@ export function RoastExperience() {
     if (!isLoading) void submit(username);
   }
 
-  function reset() {
+  const reset = useCallback(() => {
+    requestIdRef.current += 1;
     abortRef.current?.abort();
     setResult(null);
     setError("");
     setIsLoading(false);
     window.history.replaceState(null, "", window.location.pathname);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    window.setTimeout(() => document.getElementById("username")?.focus(), 200);
-  }
+    document.getElementById("username")?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
 
   return (
-    <main id="main-content" className="min-h-screen bg-[#0d1117] text-[#f0f6fc]">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-[#0d1117] text-[#f0f6fc]">
       <header className="border-b border-[#21262d] bg-[#010409]">
         <div className="app-shell flex h-16 items-center gap-3 px-4 md:px-8">
           <a href="#main-content" aria-label="GitRoast home" className="text-[#f0f6fc]"><Github className="size-8" fill="currentColor" /></a>
@@ -262,8 +265,6 @@ export function RoastExperience() {
 
       <div className="app-shell grid gap-8 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_296px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
-          <FileList isLoading={isLoading} hasResult={Boolean(result)} />
-
           <section className="github-box overflow-hidden" aria-labelledby="readme-title">
             <div className="github-box-header flex items-center gap-2 px-4 py-3 text-xs font-semibold">
               <BookOpen className="size-4 text-[#8b949e]" /> README.md
@@ -288,8 +289,10 @@ export function RoastExperience() {
                       autoComplete="off"
                       spellCheck={false}
                       maxLength={40}
+                      enterKeyHint="go"
+                      aria-describedby={error ? "form-note form-error" : "form-note"}
                       aria-invalid={Boolean(error)}
-                      className="min-w-0 flex-1 bg-transparent text-[#f0f6fc] outline-none placeholder:text-[#484f58]"
+                      className="min-w-0 flex-1 bg-transparent text-base text-[#f0f6fc] outline-none placeholder:text-[#8b949e] sm:text-sm"
                     />
                   </div>
                   <Button type="submit" disabled={isLoading} className="h-10 px-4">
@@ -323,6 +326,8 @@ export function RoastExperience() {
               </div>
             </div>
           </section>
+
+          <FileList isLoading={isLoading} hasResult={Boolean(result)} />
         </div>
 
         <aside className="space-y-6 text-sm" aria-label="About GitRoast">

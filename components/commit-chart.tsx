@@ -73,6 +73,7 @@ export function CommitChart({ summary }: { summary: RoastSummary }) {
       <div className="github-box overflow-hidden p-4">
         <div
           className="overflow-x-auto pb-1"
+          tabIndex={weeks.length ? 0 : undefined}
           role="img"
           aria-label={insight ? `${total} public contribution signals. The busiest week had ${insight.busiest}; ${insight.quietRate} percent of visible days had no contributions.` : "No public contribution calendar available."}
         >

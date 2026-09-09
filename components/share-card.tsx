@@ -16,7 +16,7 @@ import {
   Star
 } from "lucide-react";
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { RoastResponse } from "@/lib/types";
 import { compactNumber, profileScoreColor } from "@/lib/utils";
@@ -28,6 +28,13 @@ const activityPalette = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 export function ShareCard({ result }: { result: RoastResponse }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [feedback, setFeedback] = useState<Feedback>("idle");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const downloadRef = useRef(false);
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+  }, []);
   const scoreColor = profileScoreColor(result.report.roastScore);
   const bestSignal = result.report.receipts.find((receipt) => receipt.title === "Commit message exhibit")?.punchline
     ?? result.report.roast;
@@ -79,19 +86,29 @@ export function ShareCard({ result }: { result: RoastResponse }) {
     textarea.style.position = "fixed";
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand("copy");
-    textarea.remove();
-    return copied;
+    const previouslyFocused = document.activeElement;
+    try {
+      textarea.select();
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      textarea.remove();
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus({ preventScroll: true });
+    }
   }
 
   function settle(next: Feedback) {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     setFeedback(next);
-    window.setTimeout(() => setFeedback("idle"), 2200);
+    feedbackTimerRef.current = setTimeout(() => setFeedback("idle"), 2200);
   }
 
   async function download() {
-    if (!cardRef.current || feedback === "downloading") return;
+    if (!cardRef.current || downloadRef.current) return;
+    downloadRef.current = true;
+    setIsDownloading(true);
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     const card = cardRef.current;
     let exportCard: HTMLDivElement | null = null;
     setFeedback("downloading");
@@ -130,21 +147,26 @@ export function ShareCard({ result }: { result: RoastResponse }) {
       settle("error");
     } finally {
       exportCard?.remove();
+      downloadRef.current = false;
+      setIsDownloading(false);
     }
   }
 
   async function copyLink() {
+    if (downloadRef.current) return;
     const url = `${window.location.origin}?u=${encodeURIComponent(result.summary.username)}`;
     settle((await copyText(url)) ? "copied" : "error");
   }
 
   async function copyCaption() {
+    if (downloadRef.current) return;
     const url = `${window.location.origin}?u=${encodeURIComponent(result.summary.username)}`;
     const text = `@${result.summary.username} was reviewed as “${result.report.developerType}” — ${result.report.roastScore}/100.\n${reviewCommentary}\n${url}`;
     settle((await copyText(text)) ? "caption-copied" : "error");
   }
 
   async function share() {
+    if (downloadRef.current) return;
     const text = `@${result.summary.username} was reviewed as “${result.report.developerType}” — ${result.report.roastScore}/100. ${reviewCommentary}`;
     const url = `${window.location.origin}?u=${encodeURIComponent(result.summary.username)}`;
     if (navigator.share) {
@@ -159,7 +181,7 @@ export function ShareCard({ result }: { result: RoastResponse }) {
     settle((await copyText(`${text}\n${url}`)) ? "copied" : "error");
   }
 
-  const feedbackText = {
+  const feedbackText = isDownloading ? "Rendering preview..." : {
     idle: "Ready to share",
     downloading: "Rendering preview...",
     downloaded: "PNG downloaded",
@@ -262,19 +284,19 @@ export function ShareCard({ result }: { result: RoastResponse }) {
         <div className="p-4">
           <p className="text-sm leading-6 text-[#8b949e]">Export a 1200×630 review card with real profile stats, a repository verdict, and a share-ready roast.</p>
           <div className="mt-4 grid gap-2">
-            <Button type="button" onClick={download} disabled={feedback === "downloading"}>
-              {feedback === "downloading" ? <LoaderCircle className="size-4 animate-spin" /> : feedback === "downloaded" ? <Check className="size-4" /> : <Download className="size-4" />}
-              {feedback === "downloading" ? "Rendering" : "Download PNG"}
+            <Button type="button" onClick={download} disabled={isDownloading}>
+              {isDownloading ? <LoaderCircle className="size-4 animate-spin" /> : feedback === "downloaded" ? <Check className="size-4" /> : <Download className="size-4" />}
+              {isDownloading ? "Rendering" : "Download PNG"}
             </Button>
-            <Button type="button" variant="secondary" onClick={copyLink}>
+            <Button type="button" variant="secondary" onClick={copyLink} disabled={isDownloading}>
               {feedback === "copied" ? <Check className="size-4" /> : <Link2 className="size-4" />}
               Copy profile link
             </Button>
-            <Button type="button" variant="secondary" onClick={copyCaption}>
+            <Button type="button" variant="secondary" onClick={copyCaption} disabled={isDownloading}>
               {feedback === "caption-copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
               Copy roast caption
             </Button>
-            <Button type="button" variant="secondary" onClick={share}>
+            <Button type="button" variant="secondary" onClick={share} disabled={isDownloading}>
               <Share2 className="size-4" /> Share review
             </Button>
           </div>

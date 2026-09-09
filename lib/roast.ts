@@ -4,6 +4,8 @@ import { unstable_cache } from "next/cache";
 import { fetchGitHubSnapshot, normalizeGitHubUsername } from "@/lib/github";
 import { generateRoast } from "@/lib/openai";
 import { buildRoastSummary } from "@/lib/stats";
+import { enrichRepositoryEvidence } from "@/lib/repository-evidence";
+import { ROAST_PROMPT_VERSION } from "@/lib/roast-quality";
 import type { RoastResponse } from "@/lib/types";
 
 export class RoastRequestError extends Error {
@@ -17,10 +19,11 @@ export class RoastRequestError extends Error {
 }
 
 async function buildRoast(username: string): Promise<RoastResponse> {
+  const started = Date.now();
   try {
     const snapshot = await fetchGitHubSnapshot(username);
-    const summary = buildRoastSummary(snapshot);
-    const { report, generatedWith } = await generateRoast(summary);
+    const summary = await enrichRepositoryEvidence(buildRoastSummary(snapshot));
+    const { report, generatedWith } = await generateRoast(summary, { budgetMs: Math.max(0, 27_000 - (Date.now() - started)) });
     return { summary, report, generatedWith };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -37,7 +40,7 @@ async function buildRoast(username: string): Promise<RoastResponse> {
   }
 }
 
-const getCachedRoast = unstable_cache(buildRoast, ["gitroast-v9"], {
+const getCachedRoast = unstable_cache(buildRoast, [ROAST_PROMPT_VERSION, process.env.OPENAI_MODEL ?? "gpt-4o-mini", process.env.ROAST_REPOSITORY_EVIDENCE ?? "on", process.env.OPENAI_API_KEY ? "ai" : "fallback"], {
   revalidate: 60 * 60
 });
 
