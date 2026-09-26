@@ -66,64 +66,6 @@ a { color: var(--accent-fg); }
   transform: none !important;
 }
 
-@container (max-width: 700px) {
-  .share-card-details,
-  .share-card-activity {
-    display: none;
-  }
-}
-
-@container (max-width: 500px) {
-  .share-card-main {
-    grid-template-columns: 3.5rem minmax(0, 1fr) 3.5rem;
-    column-gap: 0.5rem;
-    padding: 0.75rem 1rem;
-  }
-
-  .share-card-username {
-    overflow: hidden;
-    font-size: 0.55rem;
-    overflow-wrap: normal;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .share-card-identity [data-share-title] {
-    margin-top: 0.35rem;
-    font-size: 1.25rem;
-    line-height: 1.05;
-  }
-
-  .share-card-identity p {
-    margin-top: 0.55rem;
-    font-size: 0.6rem;
-    line-height: 1.35;
-  }
-
-  .share-card-score {
-    padding: 0.4rem;
-  }
-
-  .share-card-score strong {
-    font-size: 1.5rem;
-  }
-
-  .share-card-score-label {
-    font-size: 0.45rem;
-  }
-
-  .share-card-score-label-prefix,
-  .share-card-score-unit,
-  .share-card-score-verdict,
-  .share-card-brand-suffix {
-    display: none;
-  }
-
-  .share-card-footer-summary {
-    max-width: 65%;
-  }
-}
-
 .markdown-body h1,
 .markdown-body h2 {
   margin: 0 0 16px;

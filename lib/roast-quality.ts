@@ -1,6 +1,6 @@
 import type { RoastReport, RoastSummary } from "@/lib/types";
 
-export const ROAST_PROMPT_VERSION = "gitroast-comedy-v1";
+export const ROAST_PROMPT_VERSION = "gitroast-comedy-v2";
 
 // Original editorial examples. Facts in these examples are fictional, not evidence.
 export const COMEDY_EXAMPLES = [

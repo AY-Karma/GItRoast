@@ -27,6 +27,9 @@ const activityPalette = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 export function ShareCard({ result }: { result: RoastResponse }) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState<number | null>(null);
+  const [previewZoomed, setPreviewZoomed] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>("idle");
   const [isDownloading, setIsDownloading] = useState(false);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,6 +37,15 @@ export function ShareCard({ result }: { result: RoastResponse }) {
 
   useEffect(() => () => {
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+  }, []);
+  useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    const updateScale = () => setPreviewScale(Math.min(1, preview.clientWidth / 1200));
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(preview);
+    return () => observer.disconnect();
   }, []);
   const scoreColor = profileScoreColor(result.report.roastScore);
   const bestSignal = result.report.receipts.find((receipt) => receipt.title === "Commit message exhibit")?.punchline
@@ -123,6 +135,8 @@ export function ShareCard({ result }: { result: RoastResponse }) {
         minHeight: "630px",
         maxWidth: "none",
         aspectRatio: "auto",
+        transform: "none",
+        visibility: "visible",
         pointerEvents: "none"
       });
       document.body.appendChild(exportCard);
@@ -194,11 +208,13 @@ export function ShareCard({ result }: { result: RoastResponse }) {
   return (
     <section id="share" className="app-shell grid scroll-mt-16 gap-6 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1120px)_360px] 2xl:justify-center">
       <div className="github-box share-card-preview w-full max-w-[1120px] justify-self-center overflow-hidden bg-[#010409] p-3">
-        <div
-          ref={cardRef}
-          data-share-card
-          className="relative grid aspect-[1200/630] min-h-[360px] w-full grid-rows-[clamp(3.25rem,14%,5.5rem)_minmax(0,1fr)_clamp(3rem,11%,4.5rem)] overflow-hidden rounded-md border border-[#30363d] bg-[#0d1117] text-[#f0f6fc] [container-type:inline-size]"
-        >
+        <div ref={previewRef} className={`w-full rounded-md ${previewZoomed ? "h-[630px] overflow-x-auto" : "aspect-[1200/630] overflow-hidden"}`}>
+          <div
+            ref={cardRef}
+            data-share-card
+            className="relative grid h-[630px] w-[1200px] grid-rows-[88px_minmax(0,1fr)_70px] overflow-hidden rounded-md border border-[#30363d] bg-[#0d1117] text-[#f0f6fc] [container-type:inline-size]"
+            style={{ transform: `scale(${previewZoomed ? 1 : previewScale ?? 1})`, transformOrigin: "top left", visibility: previewScale === null ? "hidden" : "visible" }}
+          >
           <div className="flex min-w-0 items-center justify-between gap-[2cqw] border-b border-[#21262d] bg-[#010409] px-[5cqw]">
             <div className="flex min-w-0 items-center gap-[clamp(0.4rem,1.4cqw,0.75rem)] font-semibold">
               <Github className="size-[clamp(1.35rem,3cqw,2rem)] shrink-0" />
@@ -247,10 +263,10 @@ export function ShareCard({ result }: { result: RoastResponse }) {
               <div className="share-card-review share-card-motion min-w-0 rounded-md border border-[#30363d] bg-[#010409] px-[1.3cqw] py-[1cqw]">
                 <div className="flex min-w-0 items-center gap-[0.7cqw]">
                   <MessageSquare className="size-[clamp(0.65rem,1.2cqw,0.9rem)] shrink-0 text-[#58a6ff]" />
-                  <span className="mono-type min-w-0 truncate text-[clamp(0.5rem,0.9cqw,0.7rem)] text-[#8b949e]">gitroast[bot] reviewed {reviewSubject}</span>
-                  <span className={`shrink-0 rounded-full border px-[0.7cqw] py-px text-[clamp(0.45rem,0.75cqw,0.6rem)] font-semibold ${reviewStatusClass}`}>{reviewStatusLabel}</span>
+                  <span className="mono-type min-w-0 truncate text-[clamp(0.75rem,1cqw,0.875rem)] text-[#8b949e]">gitroast[bot] reviewed {reviewSubject}</span>
+                  <span className={`shrink-0 rounded-full border px-[0.7cqw] py-px text-[clamp(0.65rem,0.9cqw,0.75rem)] font-semibold ${reviewStatusClass}`}>{reviewStatusLabel}</span>
                 </div>
-                <p className="mt-[0.6cqw] line-clamp-2 text-[clamp(0.58rem,1cqw,0.78rem)] leading-[1.4] text-[#c9d1d9] [overflow-wrap:anywhere]">{reviewCommentary}</p>
+                <p className="mt-[0.6cqw] line-clamp-2 text-[clamp(0.875rem,1.25cqw,1rem)] leading-[1.4] text-[#c9d1d9] [overflow-wrap:anywhere]">{reviewCommentary}</p>
               </div>
 
               <div data-share-stats className="grid min-w-0 grid-cols-2 gap-[0.6cqw]">
@@ -258,16 +274,16 @@ export function ShareCard({ result }: { result: RoastResponse }) {
                   <div key={label} className="share-card-stat share-card-motion min-w-0 rounded-md border border-[#30363d] bg-[#161b22] px-[0.8cqw] py-[0.6cqw]" style={{ animationDelay: `${150 + index * 35}ms` }}>
                     <div className="flex min-w-0 items-center gap-[0.45cqw] text-[#8b949e]">
                       <Icon className="size-[clamp(0.55rem,0.95cqw,0.72rem)] shrink-0" />
-                      <span className="truncate text-[clamp(0.45rem,0.72cqw,0.58rem)] uppercase tracking-wide">{label}</span>
+                      <span className="truncate text-[clamp(0.75rem,1cqw,0.875rem)] uppercase tracking-wide">{label}</span>
                     </div>
-                    <strong className="mt-[0.2cqw] block truncate text-[clamp(0.65rem,1.15cqw,0.9rem)] leading-none text-[#f0f6fc]">{value}</strong>
+                    <strong className="mt-[0.2cqw] block truncate text-[clamp(1rem,1.5cqw,1.25rem)] leading-none text-[#f0f6fc]">{value}</strong>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="flex min-w-0 items-center justify-between gap-[2cqw] border-t border-[#21262d] bg-[#161b22] px-[5cqw] text-[clamp(0.6rem,1.2cqw,0.875rem)]">
+          <div className="flex min-w-0 items-center justify-between gap-[2cqw] border-t border-[#21262d] bg-[#161b22] px-[5cqw] text-[clamp(0.8rem,1.2cqw,0.95rem)]">
             <span className="share-card-footer-summary flex min-w-0 items-center gap-[1cqw] text-[#c9d1d9]"><GitBranch className="size-[clamp(0.75rem,1.5cqw,1rem)] shrink-0 text-[#3fb950]" /><span className="truncate">Reviewed {result.summary.analyzedRepoCount} repos · {result.summary.sampledCommitCount} commits</span></span>
             <span className="share-card-activity flex items-center gap-[0.35cqw]" aria-label={`${result.summary.totalContributions} public contributions`}>
               {activityLevels.map((level, index) => (
@@ -276,6 +292,13 @@ export function ShareCard({ result }: { result: RoastResponse }) {
             </span>
             <span className="share-card-brand shrink-0 font-semibold text-[#58a6ff]">gitroast<span className="share-card-brand-suffix"> · unofficial</span></span>
           </div>
+        </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 text-xs text-[#8b949e]">
+          <span>The preview matches the 1200 × 630 PNG.</span>
+          <button type="button" aria-pressed={previewZoomed} onClick={() => setPreviewZoomed((value) => !value)} className="min-h-11 rounded-md border border-[#30363d] bg-[#161b22] px-3 font-medium text-[#c9d1d9] hover:bg-[#21262d]">
+            {previewZoomed ? "Fit card to screen" : "Inspect at full size"}
+          </button>
         </div>
       </div>
 
@@ -290,7 +313,7 @@ export function ShareCard({ result }: { result: RoastResponse }) {
             </Button>
             <Button type="button" variant="secondary" onClick={copyLink} disabled={isDownloading}>
               {feedback === "copied" ? <Check className="size-4" /> : <Link2 className="size-4" />}
-              Copy profile link
+              Copy review link
             </Button>
             <Button type="button" variant="secondary" onClick={copyCaption} disabled={isDownloading}>
               {feedback === "caption-copied" ? <Check className="size-4" /> : <Copy className="size-4" />}

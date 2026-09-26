@@ -4,6 +4,12 @@ out/
 dist/
 next-env.d.ts
 
+# Local agent guidance
+AGENTS.md
+CLAUDE.md
+Claude.md
+SKILL.md
+
 # Dependencies
 node_modules/
 

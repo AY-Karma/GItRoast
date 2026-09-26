@@ -190,16 +190,16 @@ export function repoAwareWeaknesses(summary: RoastSummary) {
   return [
     summary.inactiveRepos > 0
       ? `${summary.inactiveRepos} sampled repos have been silent for a year; archive them before GitHub starts carbon-dating the default branches`
-      : `No sampled originals have a year-long public push gap. The inactivity allegation has been withdrawn`,
+      : `No sampled originals have a year-long public push gap; keep maintenance notes visible so that healthy activity stays easy to verify`,
     summary.descriptionCoverage < 70
       ? `Only ${summary.descriptionCoverage}% of sampled original repos have descriptions; the rest shipped a guessing game as their onboarding flow`
-      : `${summary.descriptionCoverage}% description coverage leaves little room for the usual missing-context allegation`,
+      : `${summary.descriptionCoverage}% of sampled originals have descriptions; keep those summaries current as the projects evolve`,
     vagueCommit
       ? `“${cleanSnippet(vagueCommit)}” could use one noun explaining what changed and one clue explaining why`
       : summary.commitSamples.length
         ? `The commit subjects are annoyingly clear; mirror that context in the quieter repository descriptions`
         : `No public commit subjects were available, leaving the review timeline dramatically under-captioned`,
-    `${flavor.primaryRepo}'s metadata is on the stand; its implementation has not been inspected. The roast cannot subpoena imaginary bugs`
+    `${flavor.primaryRepo}'s public metadata was reviewed, but its code and tests were not inspected; treat this as a profile review, not a code audit`
   ].slice(0, 4);
 }
 

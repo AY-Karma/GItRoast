@@ -5,11 +5,8 @@ import {
   BookOpen,
   Check,
   ChevronRight,
-  CircleDot,
   Code2,
-  FileCode2,
   Flame,
-  GitBranch,
   Github,
   History,
   Info,
@@ -30,44 +27,16 @@ const RoastReport = dynamic(
 );
 
 const examples = ["torvalds", "gaearon", "sindresorhus"];
-const loadingSteps = [
-  "Fetching public profile and repositories",
-  "Reading the public activity timeline",
-  "Reviewing contribution activity",
-  "Generating a grounded repository review"
-] as const;
-
 function LoadingStage({ username }: { username: string }) {
-  const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    if (step === loadingSteps.length - 1) return;
-    const timer = window.setTimeout(() => {
-      setStep((current) => current + 1);
-    }, 850);
-    return () => window.clearTimeout(timer);
-  }, [step]);
-
   return (
     <div className="github-box mt-4 overflow-hidden" role="status" aria-live="polite">
-      <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold">
-        <CircleDot className="size-4 text-[#d29922]" />
-        Analysis running for @{username}
+      <div className="flex items-start gap-3 px-4 py-4">
+        <LoaderCircle className="octicon-spin mt-0.5 size-5 shrink-0 text-[#d29922]" aria-hidden="true" />
+        <div>
+          <strong className="block">Reviewing @{username}</strong>
+          <p className="mt-1 text-sm text-[#8b949e]">Collecting public signals and preparing the review. This may take a moment.</p>
+        </div>
       </div>
-      <ol className="divide-y divide-[#21262d] px-4">
-        {loadingSteps.map((label, index) => (
-          <li key={label} className="flex items-center gap-3 py-3 text-sm">
-            {index < step ? (
-              <span className="grid size-5 place-items-center rounded-full bg-[#238636] text-white"><Check className="size-3.5" /></span>
-            ) : index === step ? (
-              <span className="size-5 rounded-full border-2 border-[#d29922] border-t-transparent octicon-spin" />
-            ) : (
-              <span className="size-5 rounded-full border border-[#30363d]" />
-            )}
-            <span className={index <= step ? "text-[#f0f6fc]" : "text-[#8b949e]"}>{label}</span>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -107,7 +76,7 @@ function RepositoryHeader({ result, isLoading, username }: { result: RoastRespon
         </div>
         <nav className="mt-5 flex gap-1 overflow-x-auto" aria-label="Repository navigation">
           {[
-            [Code2, "Overview", "#main-content", true],
+            [Code2, "Overview", "#main-content", !result],
             ...(result ? [
               [Flame, "Roast report", "#verdict", false],
               [Activity, "Receipts", "#receipts", false],
@@ -129,41 +98,6 @@ function RepositoryHeader({ result, isLoading, username }: { result: RoastRespon
         </nav>
       </div>
     </div>
-  );
-}
-
-function FileList({ isLoading, hasResult }: { isLoading: boolean; hasResult: boolean }) {
-  const state = hasResult ? "complete" : isLoading ? "running" : "waiting";
-  const stateLabel = hasResult ? "review ready" : isLoading ? "analysis running" : "waiting for a username";
-  const rows = [
-    ["profile.json", "Public profile and repository metadata", state],
-    ["activity.log", "Recent public timeline and contribution signals", state],
-    ["ROAST.md", hasResult ? "Repository review comments generated" : isLoading ? "Generating grounded review comments" : "Waiting for a GitHub username", state]
-  ];
-
-  return (
-    <details className="github-box group overflow-hidden">
-      <summary className="github-box-header flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-xs hover:bg-[#21262d] [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2 font-semibold"><GitBranch className="size-4" /> Review pipeline</span>
-        <span className="flex min-w-0 items-center gap-3 text-[#8b949e]">
-          <span className="hidden truncate sm:inline">{stateLabel}</span>
-          <span className="shrink-0">3 files</span>
-          <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" />
-        </span>
-      </summary>
-      <div className="divide-y divide-[#21262d]">
-        {rows.map(([name, message, status], index) => (
-          <div key={name} className="file-state-row grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(150px,.8fr)_1.3fr_auto] sm:items-center" style={{ animationDelay: `${index * 35}ms` }}>
-            <span className="flex items-center gap-2 font-medium text-[#58a6ff]"><FileCode2 className="size-4 text-[#8b949e]" /> {name}</span>
-            <span className="truncate text-[#8b949e]">{message}</span>
-            <span className={`flex items-center gap-1.5 text-xs ${status === "complete" ? "text-[#3fb950]" : status === "running" ? "text-[#d29922]" : "text-[#8b949e]"}`}>
-              {status === "complete" ? <Check className="file-status-resolve size-3.5" /> : status === "running" ? <LoaderCircle className="octicon-spin size-3.5" /> : <CircleDot className="size-3.5" />}
-              {status === "complete" ? "reviewed" : status === "running" ? "running" : "waiting"}
-            </span>
-          </div>
-        ))}
-      </div>
-    </details>
   );
 }
 
@@ -224,14 +158,14 @@ export function RoastExperience() {
 
   useEffect(() => {
     const sharedUsername = new URLSearchParams(window.location.search).get("u");
-    const prefillTimer = sharedUsername && /^[a-zA-Z0-9-]{1,39}$/.test(sharedUsername)
-      ? window.setTimeout(() => setUsername(sharedUsername), 0)
+    const sharedReviewTimer = sharedUsername && /^[a-zA-Z0-9-]{1,39}$/.test(sharedUsername)
+      ? window.setTimeout(() => void submit(sharedUsername), 0)
       : undefined;
     return () => {
-      if (prefillTimer) window.clearTimeout(prefillTimer);
+      if (sharedReviewTimer) window.clearTimeout(sharedReviewTimer);
       abortRef.current?.abort();
     };
-  }, []);
+  }, [submit]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -295,7 +229,7 @@ export function RoastExperience() {
                       className="min-w-0 flex-1 bg-transparent text-base text-[#f0f6fc] outline-none placeholder:text-[#8b949e] sm:text-sm"
                     />
                   </div>
-                  <Button type="submit" disabled={isLoading} className="h-10 px-4">
+                  <Button type="submit" disabled={isLoading} className="h-11 px-4">
                     <Flame className="size-4" /> {isLoading ? "Analyzing…" : "Roast profile"}
                   </Button>
                 </div>
@@ -317,7 +251,7 @@ export function RoastExperience() {
                     key={example}
                     type="button"
                     disabled={isLoading}
-                    className="inline-flex items-center gap-1 font-medium text-[#58a6ff] hover:underline disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-1 rounded px-2 font-medium text-[#58a6ff] hover:bg-[#161b22] hover:underline disabled:opacity-50"
                     onClick={() => void submit(example)}
                   >
                     <Search className="size-3.5" /> @{example}
@@ -327,7 +261,6 @@ export function RoastExperience() {
             </div>
           </section>
 
-          <FileList isLoading={isLoading} hasResult={Boolean(result)} />
         </div>
 
         <aside className="space-y-6 text-sm" aria-label="About GitRoast">
@@ -346,17 +279,17 @@ export function RoastExperience() {
               ))}
             </ol>
           </div>
-          <div className="border-t border-[#21262d] pt-4">
-            <h2 className="mb-3 font-semibold">Languages</h2>
-            <div className="mb-3 flex h-2 overflow-hidden rounded-full bg-[#21262d]">
-              <span className="w-[56%] bg-[#3178c6]" /><span className="w-[25%] bg-[#f1e05a]" /><span className="w-[19%] bg-[#e34c26]" />
+          {result ? (
+            <div className="border-t border-[#21262d] pt-4">
+              <h2 className="mb-3 font-semibold">Languages observed</h2>
+              <div className="flex flex-wrap gap-2">
+                {result.summary.languages.length ? result.summary.languages.slice(0, 6).map((language) => (
+                  <span key={language} className="rounded-full border border-[#30363d] bg-[#161b22] px-2.5 py-1 text-xs text-[#c9d1d9]">{language}</span>
+                )) : <span className="text-xs text-[#8b949e]">No repository language data available.</span>}
+              </div>
+              <p className="mt-2 text-xs text-[#8b949e]">Observed in the sampled public repositories.</p>
             </div>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#3178c6]" />TypeScript</span><span className="text-[#8b949e]">56%</span></div>
-              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#f1e05a]" />JavaScript</span><span className="text-[#8b949e]">25%</span></div>
-              <div className="flex justify-between"><span><i className="mr-2 inline-block size-2 rounded-full bg-[#e34c26]" />HTML</span><span className="text-[#8b949e]">19%</span></div>
-            </div>
-          </div>
+          ) : null}
           <div className="border-t border-[#21262d] pt-4 text-xs text-[#8b949e]">
             {result ? (
               <a href="#methodology" className="flex min-h-7 items-center justify-between hover:underline">Methodology <ChevronRight className="size-4" /></a>
