@@ -29,9 +29,9 @@ function StatCard({ label, value, detail, icon: Icon }: { label: string; value: 
 
 function ReviewList({ title, kicker, items, positive }: { title: string; kicker: string; items: string[]; positive: boolean }) {
   return (
-    <section className={`review-panel overflow-hidden rounded-md border ${positive ? "border-[rgba(46,160,67,.35)]" : "border-[rgba(248,81,73,.42)]"}`}>
-      <div className={`flex items-center gap-3 border-b px-4 py-3 ${positive ? "border-[rgba(46,160,67,.24)] bg-[rgba(46,160,67,.08)]" : "border-[rgba(248,81,73,.26)] bg-[rgba(248,81,73,.08)]"}`}>
-        {positive ? <CheckCircle2 className="size-4 text-[#3fb950]" /> : <AlertCircle className="size-4 text-[#f85149]" />}
+    <section className={`review-panel overflow-hidden rounded-md border ${positive ? "border-[rgba(46,160,67,.35)]" : "border-[rgba(210,153,34,.42)]"}`}>
+      <div className={`flex items-center gap-3 border-b px-4 py-3 ${positive ? "border-[rgba(46,160,67,.24)] bg-[rgba(46,160,67,.08)]" : "border-[rgba(210,153,34,.26)] bg-[rgba(210,153,34,.08)]"}`}>
+        {positive ? <CheckCircle2 className="size-4 text-[#3fb950]" /> : <Info className="size-4 text-[#d29922]" />}
         <div>
           <span className="block text-[10px] font-semibold uppercase tracking-[.16em] text-[#8b949e]">{kicker}</span>
           <h2 className="font-semibold text-[#f0f6fc]">{title}</h2>
@@ -41,7 +41,7 @@ function ReviewList({ title, kicker, items, positive }: { title: string; kicker:
       <ul className="divide-y divide-[#21262d]">
         {items.map((item, index) => (
           <li key={`${item}-${index}`} className="review-stagger flex gap-3 px-4 py-3 text-sm leading-6 text-[#c9d1d9]" style={{ animationDelay: `${120 + index * 45}ms` }}>
-            <CircleDot className={`mt-1 size-4 shrink-0 ${positive ? "text-[#3fb950]" : "text-[#f85149]"}`} />
+            <CircleDot className={`mt-1 size-4 shrink-0 ${positive ? "text-[#3fb950]" : "text-[#d29922]"}`} />
             <span>{item}</span>
           </li>
         ))}
@@ -102,7 +102,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
           <a href="#repositories" className="report-nav-link flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-[#c9d1d9] hover:bg-[#21262d]"><MessageSquare className="size-4" /> Repositories</a>
           <a href="#receipts" className="report-nav-link flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-[#c9d1d9] hover:bg-[#21262d]"><Activity className="size-4" /> Evidence</a>
           <a href="#share" className="report-nav-link flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-[#c9d1d9] hover:bg-[#21262d]"><ExternalLink className="size-4" /> Share</a>
-          <button type="button" onClick={onReset} className="ml-auto flex h-8 shrink-0 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 font-medium text-[#c9d1d9] hover:bg-[#30363d]"><RotateCcw className="size-3.5" /> New profile</button>
+          <button type="button" onClick={onReset} className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-md border border-[#30363d] bg-[#21262d] px-3 font-medium text-[#c9d1d9] hover:bg-[#30363d]"><RotateCcw className="size-3.5" /> New profile</button>
         </nav>
       </div>
 
@@ -121,6 +121,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
                 <span className="mono-type text-[10px] font-bold uppercase tracking-[.18em] text-[#ff7b72]">Primary verdict</span>
                 <p className="mt-2 text-lg font-medium leading-8 text-[#f0f6fc]">{report.roast}</p>
               </div>
+              <a href="#share" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md border border-[#238636] bg-[#238636] px-4 text-sm font-semibold text-white hover:bg-[#2ea043]"><ExternalLink className="size-4" /> Share this review</a>
             </div>
           </section>
 
@@ -131,7 +132,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               <ReviewList title="Annoyingly mergeable" kicker="Reluctant approvals" items={report.strengths} positive />
-              <ReviewList title="Absolutely blocking this PR" kicker="Changes requested" items={report.weaknesses} positive={false} />
+              <ReviewList title="Worth a closer look" kicker="Review notes" items={report.weaknesses} positive={false} />
             </div>
           </section>
 
@@ -166,7 +167,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
           </section>
 
           <section id="repositories" className="github-box scroll-mt-16 overflow-hidden" aria-labelledby="repository-reviews-title">
-            <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold"><MessageSquare className="size-4 text-[#f85149]" /><h2 id="repository-reviews-title">Every repo gets its own problem</h2><span className="ml-auto rounded-full bg-[#30363d] px-2 py-0.5 text-xs">{report.repositoryRoasts.length}</span></div>
+            <div className="github-box-header flex flex-wrap items-center gap-2 px-4 py-3 font-semibold"><MessageSquare className="size-4 text-[#f85149]" /><h2 id="repository-reviews-title">Selected repository reviews</h2><span className="ml-auto rounded-full bg-[#30363d] px-2 py-0.5 text-xs">{report.repositoryRoasts.length} of {summary.analyzedRepoCount} sampled originals</span></div>
             {summary.repos.length ? (
               <ul className="divide-y divide-[#21262d] 2xl:grid 2xl:grid-cols-2 2xl:gap-px 2xl:divide-y-0 2xl:bg-[#21262d]" aria-label={`Repository reviews for ${summary.username}`}>
                 {summary.repos.slice(0, 6).map((repo, index) => {
@@ -190,7 +191,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
                         <span className="flex items-center gap-1"><Star className="size-3.5" /> {compactNumber(repo.stars)}</span><span className="flex items-center gap-1"><GitFork className="size-3.5" /> {compactNumber(repo.forks)}</span>
                         {repo.openIssues > 0 ? <span className="flex items-center gap-1"><CircleDot className="size-3.5" /> {compactNumber(repo.openIssues)} open</span> : null}
                         <span className="flex items-center gap-1"><GitBranch className="size-3.5" /> {repo.defaultBranch}</span><span>{pushedLabel(repo.pushedAt)}</span>
-                        <a href={repo.url} className="ml-auto inline-flex min-h-6 items-center gap-1 font-medium text-[#58a6ff] hover:underline" aria-label={`Open ${summary.username}/${repo.name} repository`}>Open the crime scene <ExternalLink className="size-3" /></a>
+                        <a href={repo.url} className="ml-auto inline-flex min-h-11 items-center gap-1 font-medium text-[#58a6ff] hover:underline" aria-label={`Open ${summary.username}/${repo.name} repository`}>Open the crime scene <ExternalLink className="size-3" /></a>
                       </div>
                     </li>
                   );
