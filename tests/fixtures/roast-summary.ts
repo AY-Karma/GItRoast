@@ -41,8 +41,8 @@ export function summary(username: string, repoName: string): RoastSummary {
       { repo: "weekend-lab", message: "temporary parser cleanup", date: "2026-08-18T00:00:00Z" }
     ],
     repos: [
-      { name: repoName, url: `https://github.com/${username}/${repoName}`, description: "A focused developer tool", language: "TypeScript", stars: 72, forks: 3, openIssues: 2, defaultBranch: "main", archived: false, topics: ["developer-tools"], pushedAt: "2026-08-20T00:00:00Z" },
-      { name: "weekend-lab", url: `https://github.com/${username}/weekend-lab`, description: null, language: "Rust", stars: 19, forks: 0, openIssues: 12, defaultBranch: "master", archived: false, topics: [], pushedAt: "2024-01-01T00:00:00Z" }
+      { name: repoName, url: `https://github.com/${username}/${repoName}`, description: "A focused developer tool", language: "TypeScript", stars: 72, forks: 3, openIssues: 2, defaultBranch: "main", archived: false, topics: ["developer-tools"], pushedAt: "2026-08-20T00:00:00Z", createdAt: "2024-01-01T00:00:00Z", selectionReasons: ["Most starred", "Hot right now"] },
+      { name: "weekend-lab", url: `https://github.com/${username}/weekend-lab`, description: null, language: "Rust", stars: 19, forks: 0, openIssues: 12, defaultBranch: "master", archived: false, topics: [], pushedAt: "2024-01-01T00:00:00Z", createdAt: "2020-01-01T00:00:00Z", selectionReasons: ["Oldest"] }
     ]
   };
 }

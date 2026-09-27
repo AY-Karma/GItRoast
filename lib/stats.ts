@@ -1,6 +1,6 @@
 import type { CommitSignal, GitHubRepo, GitHubSnapshot, RoastSummary } from "@/lib/types";
 import { clamp } from "@/lib/utils";
-import { buildRepoFlavor } from "@/lib/roast-copy";
+import { curateRepositories } from "@/lib/repo-curation";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -67,7 +67,7 @@ export function calculateProfileScore(input: ProfileScoreInput) {
 }
 
 export function calculateInactiveRepos(repos: GitHubRepo[]) {
-  return repos.filter((repo) => !repo.fork && daysSince(repo.pushed_at) > 365).length;
+  return repos.filter((repo) => !repo.fork && !repo.archived && repo.pushed_at && Number.isFinite(new Date(repo.pushed_at).getTime()) && daysSince(repo.pushed_at) > 365).length;
 }
 
 export function calculateAverageCommitLength(commits: CommitSignal[]) {
@@ -94,32 +94,23 @@ export function detectPatterns(repos: GitHubRepo[], commits: CommitSignal[]) {
   const patterns: string[] = [];
   const inactive = calculateInactiveRepos(repos);
   const shortCommits = commits.filter((commit) => commit.message.length <= 12).length;
-  const finals = commits.filter((commit) => /final|again|really|please|fix/i.test(commit.message)).length;
+  const finals = commits.filter((commit) => /\b(final|again|really|please)\b/i.test(commit.message)).length;
   const noDescription = repos.filter((repo) => !repo.fork && !repo.description).length;
   const singleLanguage = unique(repos.map((repo) => repo.language).filter(Boolean)).length <= 1;
-  const flavor = buildRepoFlavor({
-    languages: unique(repos.map((repo) => repo.language).filter(Boolean) as string[]),
-    repos: repos.slice(0, 20).map((repo) => ({
-      name: repo.name,
-      description: repo.description,
-      language: repo.language,
-      stars: repo.stargazers_count,
-      pushedAt: repo.pushed_at
-    }))
-  });
+  const languageBlend = unique(repos.map((repo) => repo.language).filter(Boolean) as string[]).slice(0, 3).join(" + ");
 
-  if (inactive > 3) patterns.push(`${flavor.primaryRepo} has enough silence to qualify as a side quest that went on sabbatical`);
-  if (shortCommits > 3) patterns.push(`Commit messages are shorter than the repo names, which is a bold editorial choice`);
-  if (finals > 1) patterns.push(`"${flavor.secondaryRepo}" appears to have multiple endings and none of them were archived`);
-  if (noDescription > 4) patterns.push("Several repos are improvising their own documentation, which is both brave and unwise");
-  if (singleLanguage && repos.length > 4) patterns.push(`The ${flavor.languageBlend} era seems to have lasted longer than the planning meeting`);
-  if (!patterns.length) patterns.push(`${flavor.primaryRepo} is suspiciously coherent, which is its own plot twist`);
+  if (inactive > 3) patterns.push(`${inactive} sampled, unarchived originals have no public push in over a year`);
+  if (shortCommits > 3) patterns.push(`${shortCommits} sampled public commit subjects are 12 characters or shorter`);
+  if (finals > 1) patterns.push(`${finals} sampled commit subjects contain final, again, really, or please`);
+  if (noDescription > 4) patterns.push(`${noDescription} sampled original repositories have no repository description`);
+  if (singleLanguage && repos.length > 4 && languageBlend) patterns.push(`The sampled repositories use ${languageBlend} as their only identified language`);
 
   return patterns.slice(0, 5);
 }
 
 export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const repos = snapshot.repos.filter((repo) => !repo.fork);
+  const curated = curateRepositories(repos);
   const languages = unique(repos.map((repo) => repo.language).filter(Boolean) as string[]);
   const inactiveRepos = calculateInactiveRepos(repos);
   const descriptionCoverage = calculateDescriptionCoverage(repos);
@@ -132,8 +123,10 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
   const totalContributions = snapshot.contributions.reduce((sum, day) => sum + day.count, 0);
   const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
   const totalForks = repos.reduce((sum, repo) => sum + repo.forks_count, 0);
+  const knownMaintenance = repos.filter((repo) => repo.archived ||
+    (repo.pushed_at && Number.isFinite(Date.parse(repo.pushed_at)))).length;
   const shippingScore = repos.length
-    ? clamp(Math.round(100 - (inactiveRepos / repos.length) * 100), 0, 100)
+    ? clamp(Math.round(50 + ((knownMaintenance - 2 * inactiveRepos) / repos.length) * 50), 0, 100)
     : 0;
   const consistencyScore = clamp(Math.round((activeRecentDays / 45) * 100), 0, 100);
   const languageDiversityScore = clamp(Math.round((languages.length / Math.max(repos.length, 1)) * 180), 10, 95);
@@ -195,7 +188,7 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
       message: commit.message.slice(0, 180),
       date: commit.date
     })),
-    repos: repos.slice(0, 20).map((repo) => ({
+    repos: curated.map(({ repo, reasons }) => ({
       name: repo.name,
       url: repo.html_url,
       description: repo.description?.slice(0, 240) ?? null,
@@ -206,7 +199,9 @@ export function buildRoastSummary(snapshot: GitHubSnapshot): RoastSummary {
       defaultBranch: repo.default_branch,
       archived: repo.archived ?? false,
       topics: repo.topics?.slice(0, 6) ?? [],
-      pushedAt: repo.pushed_at
+      pushedAt: repo.pushed_at,
+      createdAt: Number.isFinite(Date.parse(repo.created_at)) ? repo.created_at : null,
+      selectionReasons: reasons
     }))
   };
 }

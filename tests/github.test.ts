@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchGitHubSnapshot } from "@/lib/github";
+import { buildRoastSummary } from "@/lib/stats";
 import type { GitHubProfile, GitHubRepo } from "@/lib/types";
 
 const profile: GitHubProfile = {
@@ -75,6 +76,29 @@ describe("fetchGitHubSnapshot", () => {
     expect(snapshot.profile.login).toBe("testuser");
   });
 
+  it("adds star and creation lanes when recent results cannot cover the account", async () => {
+    const requests: string[] = [];
+    const mockFetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      requests.push(url);
+      if (url === "https://api.github.com/users/testuser") return json({ ...profile, public_repos: 500 });
+      if (url.includes("sort=pushed")) return json([repos[0]]);
+      if (url.includes("sort=created&direction=asc")) return json([{ ...repos[1], created_at: "2010-01-01T00:00:00Z" }]);
+      if (url.includes("sort=created&direction=desc")) return json([{ ...repos[2], created_at: "2026-09-26T00:00:00Z" }]);
+      if (url.includes("/search/repositories")) return json({ items: [{ ...repos[3], stargazers_count: 2000 }] });
+      if (url === "https://github.com/testuser.atom") return new Response(publicAtomFeed);
+      if (url.includes("/users/testuser/contributions")) return new Response("");
+      return json({ message: "not found" }, 404);
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const snapshot = await fetchGitHubSnapshot("testuser");
+    const selected = buildRoastSummary(snapshot).repos;
+    expect(requests.filter((url) => url.includes("api.github.com"))).toHaveLength(5);
+    expect(selected[0].name).toBe("repo-4");
+    expect(selected.find((item) => item.selectionReasons?.includes("Oldest"))?.name).toBe("repo-2");
+    expect(selected.find((item) => item.selectionReasons?.includes("Newest"))?.name).toBe("repo-3");
+  });
+
   it("falls back to the public profile page when the REST quota is exhausted", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -103,6 +127,9 @@ describe("fetchGitHubSnapshot", () => {
     expect(snapshot.source).toBe("public-profile");
     expect(snapshot.profile.name).toBe("Quota User");
     expect(snapshot.repos[0]?.name).toBe("fallback-repo");
+    expect(snapshot.repos[0]?.pushed_at).toBeNull();
+    expect(snapshot.repos[0]?.created_at).toBe("");
+    expect(buildRoastSummary(snapshot).shippingScore).toBe(50);
     expect(snapshot.commits[0]?.message).toBe("fix the empty commit review");
     expect(snapshot.profile.avatar_url).toContain("s=600");
   });

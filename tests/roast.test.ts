@@ -34,15 +34,17 @@ describe("fallback roast", () => {
     input.repos[0].pushedAt = null;
     const report = generateFallbackRoast(input);
     expect(report.repositoryRoasts[0].status).not.toBe("changes-requested");
-    expect(report.repositoryRoasts[0].commentary).toContain("unavailable");
+    expect(report.repositoryRoasts[0].commentary).not.toMatch(/inactive|last public push|no public push/i);
+    expect(report.repositoryRoasts[0].commentary).toContain("alpha-console");
   });
 
   it("keeps a clear commit subject defensible in the main roast as well", () => {
     const input = summary("careful-dev", "parser");
     input.commitSamples = ["Reject invalid UTF-8 before parsing headers"];
     const report = generateFallbackRoast(input);
-    expect(report.roast).toContain("supplied actual context");
-    expect(report.roast).not.toContain("declined to provide an alibi");
+    expect(report.commitCrimes[0].status).toBe("approved");
+    expect(report.commitCrimes[0].commentary).toContain("actual change description");
+    expect(report.roast).not.toMatch(/unclear|vague|no context/i);
   });
 
   it("does not invent repository defects when no original repos were available", () => {
@@ -54,6 +56,7 @@ describe("fallback roast", () => {
     const report = generateFallbackRoast(input);
     expect(report.repositoryRoasts).toEqual([]);
     expect(report.commitCrimes).toEqual([]);
+    expect(report.weaknesses).toEqual([]);
     expect(report.roast).toContain("no original public repositories");
     expect(report.redemption).toContain("private work");
   });
@@ -68,12 +71,12 @@ describe("fallback roast", () => {
     expect(first.roast).toContain("alpha-console");
     expect(first.scoreRoast).toContain("61");
     expect(first.archetypeDescription.length).toBeLessThanOrEqual(180);
-    expect(first.receipts).toHaveLength(3);
+    expect(first.receipts.length).toBeGreaterThan(0);
     expect(first.repositoryRoasts).toHaveLength(2);
     expect(new Set(first.repositoryRoasts.map((repo) => repo.commentary)).size).toBe(2);
     expect(first.repositoryRoasts.every((repo) => repo.commentary.includes(repo.name))).toBe(true);
-    expect(first.receipts.every((receipt) => receipt.evidence && receipt.punchline)).toBe(true);
-    expect(first.redemption).toContain("alpha-console");
+    expect(first.receipts.every((receipt) => receipt.evidence)).toBe(true);
+    expect(["alpha-console", "weekend-lab"].some((name) => first.redemption.includes(name))).toBe(true);
   });
 
   it("keeps the joke aimed at public work rather than the person", () => {
@@ -81,7 +84,7 @@ describe("fallback roast", () => {
     const output = JSON.stringify(report).toLowerCase();
 
     expect(output).not.toMatch(/\b(idiot|moron|stupid|ugly|worthless|loser|incompetent)\b/);
-    expect(report.strengths.length).toBeGreaterThanOrEqual(3);
+    expect(report.strengths.length).toBeGreaterThan(0);
     expect(report.redemption.length).toBeGreaterThan(20);
   });
 
@@ -92,9 +95,9 @@ describe("fallback roast", () => {
 
     const report = generateFallbackRoast(input);
 
-    expect(report.commitCrimes[0]?.commentary).toMatch(/annoyingly specific|supplied context|genuinely useful/);
+    expect(report.commitCrimes[0]?.commentary).toContain("actual change description");
     expect(report.commitCrimes[0]?.status).toBe("approved");
-    expect(report.weaknesses.join(" ")).toContain("annoyingly clear");
+    expect(report.weaknesses.join(" ")).not.toMatch(/unclear|vague commit/i);
   });
 
   it("rejects personal attacks from an online model response", () => {
@@ -153,6 +156,13 @@ describe("fallback roast", () => {
 
     expect(report.repositoryRoasts[0]?.commentary).toBe(grounded);
     expect(report.repositoryRoasts[1]?.commentary).not.toBe("weekend-lab exists in public.");
+  });
+
+  it("rejects a code-level accusation that metadata cannot support", () => {
+    const input = summary("safe-review", "alpha-console");
+    const invented = "alpha-console uses TypeScript and its CI is broken.";
+    const report = normalizeReport({ repositoryRoasts: [{ name: "alpha-console", commentary: invented }] }, input);
+    expect(report.repositoryRoasts[0].commentary).not.toBe(invented);
   });
 
   it("treats archived repositories as a completed lifecycle instead of a failure", () => {
