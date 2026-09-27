@@ -56,7 +56,21 @@ export type RepositoryEvidence = {
   runtimeDependencies?: number;
   scriptNames?: string[];
   latestRelease?: { tag: string; publishedAt: string };
+  testPathCount?: number;
+  testPathSamples?: string[];
+  workflowPathSamples?: string[];
+  recentCommit?: {
+    sha: string;
+    subject: string;
+    additions: number;
+    deletions: number;
+    filesShown: number;
+    filePaths: string[];
+    url: string;
+  };
 };
+
+export type SelectionReason = "Most starred" | "Hot right now" | "Latest push" | "Newest" | "Oldest" | "Also notable";
 
 export type RoastSummary = {
   username: string;
@@ -106,6 +120,8 @@ export type RoastSummary = {
     archived: boolean;
     topics: string[];
     pushedAt: string | null;
+    createdAt?: string | null;
+    selectionReasons?: SelectionReason[];
     evidence?: RepositoryEvidence;
   }>;
 };
@@ -113,7 +129,8 @@ export type RoastSummary = {
 export type RoastReceipt = {
   title: string;
   evidence: string;
-  punchline: string;
+  punchline?: string;
+  sourceUrl?: string;
 };
 
 export type RepositoryRoast = {

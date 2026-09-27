@@ -36,9 +36,10 @@ describe("roast generation", () => {
     const events: GenerationTelemetry[] = [];
     const result = await generateRoast(input, { onTelemetry: (event) => events.push(event) });
     expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "gpt-6-sol", reasoning: { effort: "low" } });
     expect(create.mock.calls[0][0].text).not.toHaveProperty("verbosity");
-    expect(JSON.parse(create.mock.calls[0][0].input).repositories.length).toBeLessThanOrEqual(6);
-    expect(create.mock.calls[1][0].max_output_tokens).toBe(800);
+    expect(JSON.parse(create.mock.calls[0][0].input).repositories.length).toBeLessThanOrEqual(4);
+    expect(create.mock.calls[1][0].max_output_tokens).toBe(900);
     expect(result.report.roast).toBe(repaired);
     expect(result.report.scoreRoast).toBe(score);
     expect(result.report.roastScore).toBe(input.profileScore);

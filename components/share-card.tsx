@@ -48,9 +48,17 @@ export function ShareCard({ result }: { result: RoastResponse }) {
     return () => observer.disconnect();
   }, []);
   const scoreColor = profileScoreColor(result.report.roastScore);
-  const bestSignal = result.report.receipts.find((receipt) => receipt.title === "Commit message exhibit")?.punchline
-    ?? result.report.roast;
-  const featuredReview = result.report.repositoryRoasts[0];
+  const bestSignal = result.report.roast;
+  const featuredReview = [...result.report.repositoryRoasts].sort((a, b) => {
+    const strength = (review: typeof a) => {
+      const repo = result.summary.repos.find((item) => item.name === review.name);
+      return (repo?.evidence?.runtimeDependencies !== undefined && repo.evidence.runtimeDependencies >= 20 ? 6 : 0)
+        + (repo && repo.stars >= 20 && !repo.description?.trim() ? 5 : 0)
+        + (review.status === "changes-requested" ? 3 : 0)
+        + Math.min(repo?.stars ?? 0, 100) / 100;
+    };
+    return strength(b) - strength(a);
+  })[0];
   const featuredRepository = result.summary.repos.find((repo) => repo.name === featuredReview?.name) ?? result.summary.repos[0];
   const reviewSubject = featuredReview?.name ?? featuredRepository?.name ?? "profile-review";
   const reviewCommentary = featuredReview?.commentary ?? bestSignal;

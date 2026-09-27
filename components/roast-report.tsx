@@ -39,12 +39,12 @@ function ReviewList({ title, kicker, items, positive }: { title: string; kicker:
         <span className="ml-auto rounded-full bg-[#30363d] px-2 py-0.5 text-xs">{items.length}</span>
       </div>
       <ul className="divide-y divide-[#21262d]">
-        {items.map((item, index) => (
+        {items.length ? items.map((item, index) => (
           <li key={`${item}-${index}`} className="review-stagger flex gap-3 px-4 py-3 text-sm leading-6 text-[#c9d1d9]" style={{ animationDelay: `${120 + index * 45}ms` }}>
             <CircleDot className={`mt-1 size-4 shrink-0 ${positive ? "text-[#3fb950]" : "text-[#d29922]"}`} />
             <span>{item}</span>
           </li>
-        ))}
+        )) : <li className="px-4 py-3 text-sm leading-6 text-[#8b949e]">The inspected public evidence does not support a claim here.</li>}
       </ul>
     </section>
   );
@@ -85,12 +85,12 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
     { label: "Presentation", value: summary.scoreBreakdown.presentation }
   ];
   const metrics = [
-    { label: "Public repositories", value: String(summary.repoCount), detail: `${summary.analyzedRepoCount} originals inspected; ${summary.inactiveRepos} are currently cosplaying as history.`, icon: Code2 },
-    { label: "Shipping score", value: `${summary.shippingScore}%`, detail: summary.inactiveRepos ? `${summary.inactiveRepos} repositories have been quiet for over a year.` : "Every sampled repository still has a pulse. Suspiciously tidy.", icon: Activity },
-    { label: "Described projects", value: `${summary.descriptionCoverage}%`, detail: summary.descriptionCoverage < 70 ? "The rest expect visitors to infer the plot from the title." : "Most projects remembered that mystery is not documentation.", icon: BookOpen },
-    { label: "Public contributions", value: compactNumber(summary.totalContributions), detail: "Visible calendar activity. Private heroics remain outside the courtroom.", icon: GitCommitHorizontal },
-    { label: "Commit sample", value: String(summary.sampledCommitCount), detail: "Recent public subjects invited to testify against their authoring choices.", icon: History },
-    { label: "Chaos index", value: `${summary.chaosScore}%`, detail: "A deliberately unserious composite with disturbingly serious receipts.", icon: Flame }
+    { label: "Public repositories", value: String(summary.repoCount), detail: summary.dataSource === "github-api" ? `${summary.analyzedRepoCount} original repositories sampled; ${summary.inactiveRepos} unarchived repositories have old public pushes.` : `${summary.analyzedRepoCount} original repositories sampled; public push dates were unavailable.`, icon: Code2 },
+    { label: "Shipping score", value: summary.dataSource === "github-api" ? `${summary.shippingScore}%` : "—", detail: summary.dataSource === "github-api" ? "App-defined share of sampled originals without an old unarchived public push." : "Unavailable because this limited sample has no verified push dates.", icon: Activity },
+    { label: "Described projects", value: `${summary.descriptionCoverage}%`, detail: "Share of sampled original repositories with a description.", icon: BookOpen },
+    { label: "Public contributions", value: compactNumber(summary.totalContributions), detail: "Visible calendar activity in the sampled period; private work is unknown.", icon: GitCommitHorizontal },
+    { label: "Commit sample", value: String(summary.sampledCommitCount), detail: "Recent public commit subjects available for review.", icon: History },
+    { label: "Chaos index", value: `${summary.chaosScore}%`, detail: "App-defined composite; see the score factors below.", icon: Flame }
   ];
 
   return (
@@ -127,19 +127,19 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
 
           <section aria-labelledby="review-fire-title">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-              <div><span className="mono-type text-[10px] font-semibold uppercase tracking-[.18em] text-[#8b949e]">Inline review</span><h2 id="review-fire-title" className="mt-1 text-xl font-semibold">The review, with the safety off</h2></div>
+              <div><span className="mono-type text-[10px] font-semibold uppercase tracking-[.18em] text-[#8b949e]">Inline review</span><h2 id="review-fire-title" className="mt-1 text-xl font-semibold">The review, line by line</h2></div>
               <span className="text-xs text-[#8b949e]">Generated from this profile’s public signals</span>
             </div>
             <div className="grid gap-4 xl:grid-cols-2">
               <ReviewList title="Annoyingly mergeable" kicker="Reluctant approvals" items={report.strengths} positive />
-              <ReviewList title="Worth a closer look" kicker="Review notes" items={report.weaknesses} positive={false} />
+              <ReviewList title={report.weaknesses.length ? "Changes requested" : "No supported blockers"} kicker={report.weaknesses.length ? "Observed friction" : "Limited public evidence"} items={report.weaknesses} positive={!report.weaknesses.length} />
             </div>
           </section>
 
           <section className="github-box overflow-hidden" aria-labelledby="suggested-patch-title">
             <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold"><Lightbulb className="size-4 text-[#3fb950]" /><h2 id="suggested-patch-title">The one patch that might save this branch</h2><code className="mono-type ml-auto hidden text-xs font-normal text-[#8b949e] sm:block">roast.patch</code></div>
             <div className="mono-type overflow-hidden text-xs leading-6">
-              <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] border-b border-[rgba(248,81,73,.2)] bg-[rgba(248,81,73,.08)] text-[#c9d1d9]"><span className="select-none border-r border-[rgba(248,81,73,.18)] px-3 text-right text-[#8b949e]">−</span><span className="break-words px-3 py-1">observed: context is apparently an optional dependency</span></div>
+              <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] border-b border-[rgba(248,81,73,.2)] bg-[rgba(248,81,73,.08)] text-[#c9d1d9]"><span className="select-none border-r border-[rgba(248,81,73,.18)] px-3 text-right text-[#8b949e]">−</span><span className="break-words px-3 py-1">observed: {report.weaknesses[0] ?? "The public sample has limited evidence."}</span></div>
               <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] bg-[rgba(46,160,67,.1)] text-[#c9d1d9]"><span className="select-none border-r border-[rgba(46,160,67,.2)] px-3 text-right text-[#3fb950]">+</span><span className="break-words px-3 py-1">suggested: {report.redemption}</span></div>
             </div>
           </section>
@@ -163,7 +163,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
                   );
                 })}
               </div>
-            ) : <div className="p-6 text-center text-sm text-[#8b949e]">The public commit trail invoked its right to remain silent.</div>}
+            ) : <div className="p-6 text-center text-sm text-[#8b949e]">No public commit subjects were available in this sample.</div>}
           </section>
 
           <section id="repositories" className="github-box scroll-mt-16 overflow-hidden" aria-labelledby="repository-reviews-title">
@@ -179,6 +179,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
                       <div className="flex flex-wrap items-center gap-2">
                         <Code2 className="review-repo-icon size-4 shrink-0 text-[#8b949e]" />
                         <a href={repo.url} className="min-w-0 break-all font-semibold text-[#58a6ff] hover:underline" aria-label={`View ${summary.username}/${repo.name} on GitHub`}>{summary.username}/{repo.name}</a>
+                        {repo.selectionReasons?.filter((reason) => reason !== "Also notable").map((reason) => <span key={reason} className="rounded-full border border-[rgba(88,166,255,.35)] bg-[rgba(88,166,255,.1)] px-2 py-0.5 text-[11px] text-[#79c0ff]">{reason === "Most starred" ? "Top starred in sample" : reason === "Newest" || reason === "Oldest" ? `${reason} in sample` : reason}</span>)}
                         {repo.archived ? <span className="flex items-center gap-1 rounded-full border border-[rgba(210,153,34,.45)] bg-[rgba(210,153,34,.1)] px-2 py-0.5 text-[11px] text-[#e3b341]"><Archive className="size-3" /> Archived</span> : null}
                         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.classes}`}>{status.label}</span>
                       </div>
@@ -191,13 +192,13 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
                         <span className="flex items-center gap-1"><Star className="size-3.5" /> {compactNumber(repo.stars)}</span><span className="flex items-center gap-1"><GitFork className="size-3.5" /> {compactNumber(repo.forks)}</span>
                         {repo.openIssues > 0 ? <span className="flex items-center gap-1"><CircleDot className="size-3.5" /> {compactNumber(repo.openIssues)} open</span> : null}
                         <span className="flex items-center gap-1"><GitBranch className="size-3.5" /> {repo.defaultBranch}</span><span>{pushedLabel(repo.pushedAt)}</span>
-                        <a href={repo.url} className="ml-auto inline-flex min-h-11 items-center gap-1 font-medium text-[#58a6ff] hover:underline" aria-label={`Open ${summary.username}/${repo.name} repository`}>Open the crime scene <ExternalLink className="size-3" /></a>
+                        <a href={repo.url} className="ml-auto inline-flex min-h-11 items-center gap-1 font-medium text-[#58a6ff] hover:underline" aria-label={`Open ${summary.username}/${repo.name} repository`}>Open repository <ExternalLink className="size-3" /></a>
                       </div>
                     </li>
                   );
                 })}
               </ul>
-            ) : <div className="p-6 text-center text-sm text-[#8b949e]">No original public repositories were available. Even the roast got ghosted.</div>}
+            ) : <div className="p-6 text-center text-sm text-[#8b949e]">No original public repositories were available to review.</div>}
           </section>
         </div>
 
@@ -241,14 +242,14 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
             <div className="min-w-0"><CommitChart summary={summary} /></div>
             <section className="github-box min-w-0 overflow-hidden" aria-labelledby="roast-receipts-title">
               <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold"><Flame className="size-4 text-[#f85149]" /><h3 id="roast-receipts-title">Roast receipts</h3><span className="ml-auto rounded-full bg-[#30363d] px-2 py-0.5 text-xs">{report.receipts.length}</span></div>
-              <div className="divide-y divide-[#21262d]">{report.receipts.map((receipt) => <article key={receipt.title} className="px-4 py-4"><strong className="text-sm text-[#58a6ff]">{receipt.title}</strong><code className="mt-2 block rounded-md border border-[#30363d] bg-[#161b22] px-3 py-2 text-xs leading-5 text-[#c9d1d9]">{receipt.evidence}</code><p className="mt-2 text-sm leading-6 text-[#f0f6fc]">{receipt.punchline}</p></article>)}</div>
+              <div className="divide-y divide-[#21262d]">{report.receipts.map((receipt, index) => <article key={`${receipt.title}-${index}`} className="px-4 py-4"><strong className="text-sm text-[#58a6ff]">{receipt.title}</strong><code className="mt-2 block rounded-md border border-[#30363d] bg-[#161b22] px-3 py-2 text-xs leading-5 text-[#c9d1d9]">{receipt.evidence}</code>{receipt.punchline ? <p className="mt-2 text-sm leading-6 text-[#f0f6fc]">{receipt.punchline}</p> : null}{receipt.sourceUrl ? <a href={receipt.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#58a6ff] hover:underline">View source <ExternalLink className="size-3" /></a> : null}</article>)}</div>
             </section>
           </div>
 
           <section id="methodology" className="mt-6 github-box scroll-mt-16 overflow-hidden" aria-labelledby="analysis-method-title">
             <div className="github-box-header flex items-center gap-2 px-4 py-3 font-semibold"><Info className="size-4 text-[#58a6ff]" /><h3 id="analysis-method-title">How this roast was assembled</h3></div>
             <div className="grid gap-px bg-[#21262d] text-sm leading-6 md:grid-cols-3">
-              <div className="bg-[#0d1117] p-4"><strong className="text-[#c9d1d9]">What we read</strong><p className="mt-1 text-[#8b949e]">Public profile metadata, up to 100 recent repositories, public activity, commit subjects, and the contribution calendar. Selected public README excerpts, package metadata, and releases may also inform the review.</p></div>
+              <div className="bg-[#0d1117] p-4"><strong className="text-[#c9d1d9]">What we read</strong><p className="mt-1 text-[#8b949e]">{summary.dataSource === "github-api" ? "A bounded public repository sample spanning stars, recent pushes, newest creation, and oldest creation; public activity, commit subjects, and the contribution calendar. Selected README excerpts, package metadata, file trees, releases, and one authored commit scope may also inform the review." : "A limited public profile page, visible repository descriptions and stars, public commit subjects, and the contribution calendar. Creation and push dates could not be verified for this run."}</p></div>
               <div className="bg-[#0d1117] p-4"><strong className="text-[#c9d1d9]">Where it came from</strong><p className="mt-1 text-[#8b949e]">This run used {summary.dataSource === "github-api" ? "GitHub’s public REST API" : "a limited public profile fallback"}. Private and organization-only work is excluded.</p></div>
               <div className="bg-[#0d1117] p-4"><strong className="text-[#c9d1d9]">How scoring works</strong><p className="mt-1 text-[#8b949e]">Activity 45%, impact 25%, consistency 12%, maintenance 10%, and presentation 8%. It measures public profile signals, not engineering ability.</p></div>
             </div>
@@ -257,7 +258,7 @@ export const RoastReport = memo(function RoastReport({ result, headingRef, onRes
       </section>
 
       <ShareCard result={result} />
-      <div className="app-shell px-4 pb-10 md:px-6"><div className="github-box flex flex-col items-start gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"><div><strong>@{summary.username} survived the review</strong><p className="mt-1 text-sm text-[#8b949e]">The repositories will need a minute.</p></div><Button type="button" onClick={onReset}><Github className="size-4" /> Roast another profile</Button></div></div>
+      <div className="app-shell px-4 pb-10 md:px-6"><div className="github-box flex flex-col items-start gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"><div><strong>Review complete for @{summary.username}</strong><p className="mt-1 text-sm text-[#8b949e]">Based on {summary.analyzedRepoCount} sampled original repositories and {summary.sampledCommitCount} public commit subjects.</p></div><Button type="button" onClick={onReset}><Github className="size-4" /> Roast another profile</Button></div></div>
     </article>
   );
 });

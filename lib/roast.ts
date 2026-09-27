@@ -40,7 +40,7 @@ async function buildRoast(username: string): Promise<RoastResponse> {
   }
 }
 
-const getCachedRoast = unstable_cache(buildRoast, [ROAST_PROMPT_VERSION, process.env.OPENAI_MODEL ?? "gpt-4o-mini", process.env.ROAST_REPOSITORY_EVIDENCE ?? "on", process.env.OPENAI_API_KEY ? "ai" : "fallback"], {
+const getCachedRoast = unstable_cache(buildRoast, [ROAST_PROMPT_VERSION, process.env.OPENAI_MODEL ?? "gpt-6-sol", process.env.ROAST_REPOSITORY_EVIDENCE ?? "on", process.env.OPENAI_API_KEY ? "ai" : "fallback"], {
   revalidate: 60 * 60
 });
 

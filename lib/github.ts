@@ -184,9 +184,9 @@ async function fetchWebSnapshot(
       stargazers_count: stars,
       forks_count: 0,
       language,
-      pushed_at: updatedAt,
+      pushed_at: null,
       updated_at: updatedAt,
-      created_at: updatedAt,
+      created_at: "",
       size: 0,
       open_issues_count: 0,
       default_branch: "main"
@@ -263,13 +263,29 @@ export async function fetchGitHubSnapshot(rawUsername: string): Promise<GitHubSn
   try {
     [profile, repos] = await Promise.all([
       githubFetch<GitHubProfile>(`/users/${username}`),
-      githubFetch<GitHubRepo[]>(`/users/${username}/repos?per_page=100&sort=updated`)
+      githubFetch<GitHubRepo[]>(`/users/${username}/repos?per_page=100&sort=pushed&direction=desc`)
     ]);
   } catch (error) {
     if (error instanceof Error && /\b(?:403|429)\b/.test(error.message)) {
       return fetchWebSnapshot(username, contributionsPromise, commitsPromise);
     }
     throw error;
+  }
+
+  if (profile.public_repos > 100) {
+    // The user-repo endpoint cannot sort by stars. These bounded lanes keep
+    // older and popular projects eligible even when the recent page is full.
+    const extra = await Promise.allSettled([
+      githubFetch<GitHubRepo[]>(`/users/${username}/repos?per_page=100&sort=created&direction=asc`),
+      githubFetch<GitHubRepo[]>(`/users/${username}/repos?per_page=100&sort=created&direction=desc`),
+      githubFetch<{ items: GitHubRepo[] }>(`/search/repositories?q=${encodeURIComponent(`user:${username} fork:false`)}&sort=stars&order=desc&per_page=20`)
+    ]);
+    const candidates = [repos,
+      ...(extra[0].status === "fulfilled" ? [extra[0].value] : []),
+      ...(extra[1].status === "fulfilled" ? [extra[1].value] : []),
+      ...(extra[2].status === "fulfilled" && Array.isArray(extra[2].value.items) ? [extra[2].value.items] : [])
+    ].flat();
+    repos = [...new Map(candidates.map((repo) => [repo.full_name.toLowerCase(), repo])).values()];
   }
 
   const [commits, contributions] = await Promise.all([commitsPromise, contributionsPromise]);
