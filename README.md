@@ -1,79 +1,64 @@
-# GitRoast
+<p align="center">
+  <img src="app/icon.svg" alt="GitRoast logo" width="72" height="72" />
+</p>
 
-GitRoast turns a public GitHub profile into a funny, evidence-backed code review. It samples repository health, the public activity timeline, descriptions, languages, and contribution activity, then produces a shareable report.
+<h1 align="center">GitRoast</h1>
 
-## What is in this version
+<p align="center">A playful code review for public GitHub profiles.</p>
 
-- GitHub-native repository and profile interface with responsive review cards
-- Accessible loading, error, score, contribution, and keyboard states
-- Four curated repository lanes: top stars, recently pushed with traction, newest creation, and oldest creation; larger accounts use bounded additional GitHub queries
-- Recent commit subjects from GitHub's public Atom timeline, including during REST quota exhaustion
-- Evidence-ranked local roasts plus optional OpenAI Responses API Structured Outputs and a report-wide premise plan
-- One grounded roast comment per visible repository, with validated AI enhancement and deterministic local fallbacks
-- GitHub-style review summaries, repository verdict labels, commit timelines, and a constructive `roast.patch`
-- Short, reduced-motion-safe state transitions instead of ambient or looping visual effects
-- Linked factual receipts, a constructive patch, prompt-injection resistance, and output safety checks
-- Lazy-loaded report and PNG exporter
-- One-hour result cache and best-effort per-instance request limiting
-- Bounded JSON body parsing, cross-site rejection, and production security headers
-- 1200 x 630 share-card export and matching Open Graph artwork
+[![Example GitRoast report with a profile verdict, inline review, and score](docs/ui-preview/before-share.png)](docs/ui-preview/before-share.png)
 
-The full product and architecture roadmap lives in [OVERHAUL.md](./OVERHAUL.md). The current roast-system diagnosis and primary-source research live in [docs/roast-system-research-2026-09.md](./docs/roast-system-research-2026-09.md).
+*Illustrative review of a public profile. Wording and scores depend on the available evidence.*
 
-## Run locally
+## Quick start
+
+Requires Node.js 20.9+ and npm. API keys are optional.
 
 ```bash
-npm install
-cp .env.example .env.local
+npm ci
 npm run dev
 ```
 
-On PowerShell, use `Copy-Item .env.example .env.local` instead of `cp` if needed. Open [http://localhost:3000](http://localhost:3000).
+Open [localhost:3000](http://localhost:3000) and enter a public GitHub username, or try an example on the home screen. A completed review lets you inspect linked evidence, download a 1200 × 630 PNG card, or copy a link that reruns the review for the same username.
 
-Environment variables:
+## What the review includes
 
-```dotenv
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-6-sol
-GITHUB_TOKEN=
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
+- **Profile verdict:** a comic score and a breakdown of the public signals behind it.
+- **Repository and commit reviews:** comments on selected repositories and recent public commit subjects.
+- **Receipts and a next step:** links to the underlying work plus a suggested `roast.patch`.
+- **Shareable output:** a review link and PNG card.
 
-`OPENAI_API_KEY` is optional; without it, GitRoast uses the local roast engine. The local engine produces fewer lines when evidence is thin. The default AI model is `gpt-6-sol`; set `OPENAI_MODEL` to another supported model if you want to compare quality, latency, and cost. `GITHUB_TOKEN` is strongly recommended for higher public-API limits and should be a least-privilege token for public data. Repository enrichment makes up to sixteen additional, best-effort GitHub requests for four curated repositories per uncached profile; `ROAST_REPOSITORY_EVIDENCE=off` disables them.
+## Configuration
 
-## Deploy to Vercel
+For optional settings, copy `.env.example` to `.env.local`:
 
-Import the repository in Vercel and keep the detected framework as **Next.js**. Vercel will use the existing `npm run build` command; the `npm run start` script is also available for running the production build locally. No custom adapter or `vercel.json` is required.
+| Variable | Purpose |
+| --- | --- |
+| `GITHUB_TOKEN` | Raises GitHub's public API limit; use a least-privilege token for public data. |
+| `OPENAI_API_KEY` | Enables AI-assisted report text. Without it, the local roast engine runs. |
+| `OPENAI_MODEL` | Selects the AI model (default: `gpt-6-sol`). |
+| `ROAST_REPOSITORY_EVIDENCE` | Set to `off` to skip optional repository evidence requests (default: `on`). |
+| `NEXT_PUBLIC_SITE_URL` | Sets the canonical URL for generated metadata in production. |
 
-Set these variables in the Vercel project settings (for Preview and Production as appropriate):
+## How it works
 
-```dotenv
-NEXT_PUBLIC_SITE_URL=https://your-production-domain.example
-GITHUB_TOKEN=                # optional, least-privilege public-data token
-OPENAI_API_KEY=              # optional; local roast engine is the fallback
-OPENAI_MODEL=gpt-6-sol
-```
+GitRoast samples public GitHub repositories, descriptions, languages, contribution activity, and recent commit subjects. It selects notable repositories for review and may inspect bounded public README, package, release, tree, and commit evidence. Results can be cached for up to one hour. When an OpenAI key is configured, a bounded selection of these public signals is sent to the model.
 
-`NEXT_PUBLIC_SITE_URL` should include the protocol and your canonical production host. If it is omitted, Vercel's deployment URL is used for generated metadata. After deployment, `GET /api/health` provides a cache-disabled liveness check.
+Scores are comic heuristics about visible work, not measures of engineering skill. Missing or rate-limited evidence stays unknown; private work is excluded, and a file's presence does not prove its tests pass. Roasts address code habits and public artifacts, not personal traits.
 
-## Checks
+## Deploy
+
+Import the repository into Vercel as a Next.js project, set `NEXT_PUBLIC_SITE_URL` to your production host, and add any optional keys. `GET /api/health` provides a liveness check. A public deployment across multiple instances needs a distributed request limiter, durable cache, and global model-spend controls in place of the included process-local limiter.
+
+## Contributing
+
+Run the project checks before submitting changes:
 
 ```bash
 npm run lint
 npm test
 npm run typecheck
 npm run build
-npm audit --omit=dev
 ```
 
-## Data and tone
-
-GitRoast only requests public GitHub data. Up to four featured originals are selected from a bounded sample; for accounts with over 100 repositories, GitRoast also requests oldest/newest creation lanes and a star-sorted search. A failed optional lane leaves a partial sample, so category labels are sample-relative. When the REST API is rate-limited, the limited public-page fallback cannot establish creation or push dates and omits those claims; unknown maintenance contributes a neutral score and the shipping metric is hidden. “Hot” means a push within 180 days weighted by existing stars and forks; if none qualifies, the freshest sampled repository is labeled “Latest push.” Neither label measures recent star growth or proves that the profile owner authored that push. When OpenAI is configured, it sends a bounded selection of public aggregates, repository names/descriptions, recent public commit subjects, and inspected README/package/release/tree/commit-scope evidence to the configured model. Results may be cached for up to one hour. A file path in a repository tree proves presence, not that tests or workflows pass; commit counts show scope, not code quality; unavailable evidence is treated as unknown.
-
-The scores are comic heuristics, not measures of skill or employability. Roasts target code habits, not identity, appearance, or personal circumstances.
-
-The profile score is deterministic and favors current public work: 45% activity, 25% public impact (stars, forks, and followers), 12% consistency, 10% repository maintenance, and 8% project/commit presentation. Square-root scaling keeps viral repositories from overwhelming every other signal.
-
-## Production note
-
-The included rate limiter is a bounded, process-local safety net. A public multi-instance deployment must replace it with an atomic distributed limiter, a durable result cache/single-flight lock, and a global model-spend budget before launch.
+The Next.js app is in [`app/`](app), the report UI in [`components/`](components), and GitHub retrieval, scoring, and generation in [`lib/`](lib). See the [`product roadmap`](OVERHAUL.md) and [`roast-system research`](docs/roast-system-research-2026-09.md) for more context.
