@@ -22,20 +22,20 @@ const metadataBase =
 export const metadata: Metadata = {
   metadataBase,
   title: {
-    default: "GitRoast - GitHub profile review",
+    default: "GitRoast - Your GitHub. Roasted.",
     template: "%s - GitRoast"
   },
-  description: "Turn a public GitHub profile into a funny, data-backed code review.",
+  description: "Get a funny, data-backed review of your public GitHub profile. Read the roast, follow the receipts, and share your review card. No sign-in required.",
   keywords: ["GitHub", "developer tools", "AI roast", "coding stats", "open source"],
   openGraph: {
-    title: "GitRoast - GitHub profile review",
+    title: "GitRoast - Your GitHub. Roasted.",
     description: "A funny, data-backed review of your public GitHub activity.",
     type: "website",
     siteName: "GitRoast"
   },
   twitter: {
     card: "summary_large_image",
-    title: "GitRoast - GitHub profile review",
+    title: "GitRoast - Your GitHub. Roasted.",
     description: "A funny, data-backed review of your public GitHub activity."
   },
   robots: { index: true, follow: true }

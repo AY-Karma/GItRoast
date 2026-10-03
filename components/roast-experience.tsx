@@ -18,6 +18,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { RoastResponse } from "@/lib/types";
@@ -188,7 +189,7 @@ export function RoastExperience() {
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-[#0d1117] text-[#f0f6fc]">
       <header className="border-b border-[#21262d] bg-[#010409]">
         <div className="app-shell flex h-16 items-center gap-3 px-4 md:px-8">
-          <a href="#main-content" aria-label="GitRoast home" className="text-[#f0f6fc]"><Github className="size-8" fill="currentColor" /></a>
+          <Link href="/" aria-label="GitRoast home" className="text-[#f0f6fc]"><Github className="size-8" fill="currentColor" /></Link>
           <div className="h-6 w-px bg-[#30363d]" />
           <span className="font-semibold text-[#f0f6fc]">GitRoast</span>
           <span className="hidden rounded-full border border-[#30363d] px-2 py-0.5 text-xs text-[#8b949e] sm:inline">Unofficial</span>

@@ -70,3 +70,8 @@ pnpm-debug.log*
 coverage/
 artifacts/roast-evaluation/
 .nyc_output/
+
+# Local skills and research
+/skills/
+/SKILLS/
+/docs/
